@@ -263,8 +263,8 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     )
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
-    tab1, tab2, tab3 = st.tabs([
-        "📡Visibility", "💬Engagement", "🏆Top Content"
+    tab1, tab2 = st.tabs([
+        "📡Visibility", "💬Engagement"
     ])
 
     # ── TAB 1: Engagement ─────────────────────────────────────────────────────
@@ -491,8 +491,7 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
 
     # ── TAB 2: Visibility ─────────────────────────────────────────────────────
     with tab1:
-        reach_df       = series_to_df(ig_profile.get("reach", []))
-        impressions_df = series_to_df(ig_profile.get("impressions", []))
+        reach_df = series_to_df(ig_profile.get("reach", []))
 
         # ── Fallbacks: build daily series from per-post data when account-level
         #    API series are blocked/empty. Posts are grouped by publication date.
@@ -509,16 +508,11 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
                 [{"date": pd.Timestamp(k), "value": v} for k, v in sorted(_d.items())]
             )
 
-        _reach_from_posts       = False
-        _impressions_from_posts = False
+        _reach_from_posts = False
 
         if reach_df.empty and ig_posts:
             reach_df = _posts_daily("reach")
             _reach_from_posts = not reach_df.empty
-
-        if impressions_df.empty and ig_posts:
-            impressions_df = _posts_daily("impressions")
-            _impressions_from_posts = not impressions_df.empty
 
         # ── Reach chart ──
         if not reach_df.empty:
@@ -559,192 +553,6 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
             r2.metric("Pic", _peak_r["date"].strftime("%b %d"), delta=f"{int(_peak_r['value']):,}")
             r3.metric("Moy. journalière",  f"{int(reach_df['value'].mean()):,}")
 
-        # ── Impressions chart ──
-        if not impressions_df.empty:
-            _imp_src = (
-                ' <span style="font-size:0.62rem;color:rgba(255,165,0,0.7);'
-                'font-weight:400;letter-spacing:0;">(estimé — agrégé depuis les publications)</span>'
-                if _impressions_from_posts else ""
-            )
-            _imp_hdr_c   = "rgba(255,255,255,0.35)" if _dark else "#9ca3af"
-            _imp_hdr_brd = "rgba(255,255,255,0.08)"  if _dark else "#e5e7eb"
-            _note_tc     = "rgba(255,255,255,0.45)"  if _dark else "#6b7280"
-            _note_bc     = "rgba(255,255,255,0.6)"   if _dark else "#374151"
-            st.markdown(
-                f'<div style="font-size:0.68rem;color:{_imp_hdr_c};'
-                f'text-transform:uppercase;letter-spacing:0.08em;'
-                f'margin:1.4rem 0 0.6rem;border-bottom:1px solid {_imp_hdr_brd};'
-                f'padding-bottom:0.4rem;">📢 IMPRESSIONS *{_imp_src}</div>',
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                f'<div style="background:rgba(99,102,241,0.07);border-left:3px solid rgba(99,102,241,0.5);'
-                f'border-radius:0 8px 8px 0;padding:0.45rem 0.85rem;margin-bottom:0.7rem;'
-                f'font-size:0.76rem;color:{_note_tc};line-height:1.5;">'
-                f'* Les impressions des <b style="color:{_note_bc};">Stories passées</b> '
-                f'ne sont pas disponibles via l\'API Meta après 24h — ce graphique couvre '
-                f'uniquement le feed &amp; les Reels.'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-            fig_imp = go.Figure()
-            fig_imp.add_trace(go.Scatter(
-                x=impressions_df["date"], y=impressions_df["value"],
-                name="Impressions", fill="tozeroy",
-                line=dict(color="#ec4899", width=2),
-                fillcolor="rgba(236,72,153,0.12)",
-                mode="lines+markers",
-                marker=dict(size=4, color="#ec4899"),
-            ))
-            fig_imp.update_layout(**{
-                **get_chart_layout(),
-                "showlegend": False,
-                "margin": dict(l=0, r=0, t=10, b=30),
-                "height": 220,
-            })
-            st.plotly_chart(fig_imp, width="stretch")
-
-            _total_imp_v = int(impressions_df["value"].sum())
-            _peak_imp    = impressions_df.loc[impressions_df["value"].idxmax()]
-            i1, i2, i3  = st.columns(3)
-            i1.metric("Total Impressions", f"{_total_imp_v:,}")
-            i2.metric("Pic", _peak_imp["date"].strftime("%b %d"), delta=f"{int(_peak_imp['value']):,}")
-            i3.metric("Moy. journalière",  f"{int(impressions_df['value'].mean()):,}")
-
-        if reach_df.empty and impressions_df.empty:
+        if reach_df.empty:
             st.info("No visibility data available for this period.")
 
-    # ── TAB 3: Top Content ────────────────────────────────────────────────────
-    with tab3:
-        _ig_metrics = [
-            ("👁️", "Vues",             "impressions"),
-            ("❤️", "Réactions",        "reactions"),
-            ("💬", "Commentaires",     "comments"),
-            ("🔖", "Enregistrements",  "saves"),
-            ("↗️", "Partages",         "shares"),
-        ]
-        if ig_posts:
-            render_top3_podium(
-                ig_posts,
-                sort_key="impressions",
-                title="TOP #3 PUBLICATIONS PAR VISIBILITÉ",
-                metrics=_ig_metrics,
-            )
-            st.divider()
-            render_top3_podium(
-                ig_posts,
-                sort_key="total_interactions",
-                title="TOP #3 PUBLICATIONS PAR ENGAGEMENT",
-                metrics=_ig_metrics,
-            )
-
-            # ── Content Type Breakdown ────────────────────────────────────────
-            st.divider()
-            st.markdown(
-                f'<div style="text-align:center;margin:0.5rem 0 1.2rem;">'
-                f'<span style="font-size:1.1rem;font-weight:700;text-transform:uppercase;'
-                f'letter-spacing:0.08em;color:{"#ffffff" if _dark else "#111827"};">'
-                f'📊 Performance par type de contenu</span>'
-                f'<div style="height:3px;width:60px;background:linear-gradient(90deg,#E8420A,#FF6B35);'
-                f'border-radius:2px;margin:0.4rem auto 0;"></div></div>',
-                unsafe_allow_html=True,
-            )
-
-            import collections as _col
-            # Normalize Instagram media_type labels
-            def _ig_type_label(raw: str) -> str:
-                return {"IMAGE": "Photo", "VIDEO": "Vidéo", "CAROUSEL_ALBUM": "Carrousel", "REEL": "Reel"}.get(raw, raw or "Autre")
-
-            _type_data = _col.defaultdict(lambda: {"impressions": [], "interactions": [], "count": 0})
-            for p in ig_posts:
-                t = _ig_type_label(p.get("media_type", ""))
-                _type_data[t]["impressions"].append(p.get("impressions", 0))
-                _type_data[t]["interactions"].append(p.get("total_interactions", 0))
-                _type_data[t]["count"] += 1
-
-            if _type_data:
-                _types     = list(_type_data.keys())
-                _avg_imp   = [round(sum(v["impressions"]) / len(v["impressions"])) for v in _type_data.values()]
-                _avg_inter = [round(sum(v["interactions"]) / len(v["interactions"])) for v in _type_data.values()]
-                _counts    = [v["count"] for v in _type_data.values()]
-                _avg_eng   = [
-                    round(sum(v["interactions"]) / sum(v["impressions"]) * 100, 2)
-                    if sum(v["impressions"]) > 0 else 0.0
-                    for v in _type_data.values()
-                ]
-
-                _type_colors = {
-                    "Photo":     ("#6366f1", "rgba(99,102,241,0.5)"),
-                    "Vidéo":     ("#f43f5e", "rgba(244,63,94,0.5)"),
-                    "Carrousel": ("#f59e0b", "rgba(245,158,11,0.5)"),
-                    "Reel":      ("#10b981", "rgba(16,185,129,0.5)"),
-                    "Autre":     ("#71717a", "rgba(113,113,122,0.5)"),
-                }
-                _default_solid = "#6366f1"
-                _default_fade  = "rgba(99,102,241,0.5)"
-
-                fig_type = go.Figure()
-                fig_type.add_trace(go.Bar(
-                    name="Impressions moy.",
-                    x=_types, y=_avg_imp,
-                    marker_color=[_type_colors.get(t, (_default_solid, _default_fade))[0] for t in _types],
-                    text=[f"{v:,}" for v in _avg_imp],
-                    textposition="outside",
-                ))
-                fig_type.add_trace(go.Bar(
-                    name="Interactions moy.",
-                    x=_types, y=_avg_inter,
-                    marker_color=[_type_colors.get(t, (_default_solid, _default_fade))[1] for t in _types],
-                    text=[f"{v:,}" for v in _avg_inter],
-                    textposition="outside",
-                ))
-                fig_type.update_layout(**{
-                    **get_chart_layout(),
-                    "barmode": "group",
-                    "showlegend": True,
-                    "legend": dict(
-                        orientation="h", yanchor="bottom", y=-0.28,
-                        xanchor="center", x=0.5,
-                        font=dict(size=11, color="rgba(255,255,255,0.6)" if _dark else "#6b7280"),
-                        bgcolor="rgba(0,0,0,0)",
-                    ),
-                    "margin": dict(l=0, r=0, t=30, b=70),
-                    "height": 320,
-                    "yaxis": dict(
-                        gridcolor="rgba(255,255,255,0.06)" if _dark else "#e5e7eb",
-                        tickformat=",", showline=False,
-                    ),
-                    "xaxis": dict(showline=False),
-                })
-                st.plotly_chart(fig_type, width="stretch")
-
-                # Summary mini-cards
-                _cols_list = st.columns(len(_types)) if len(_types) <= 4 else st.columns(4)
-                _bg  = "rgba(255,255,255,0.05)" if _dark else "#ffffff"
-                _brd = "none" if _dark else "1px solid #e5e7eb"
-                _lc  = "rgba(255,255,255,0.45)" if _dark else "#6b7280"
-                _vc  = "#ffffff" if _dark else "#111827"
-                for col_w, t, cnt, ai_v, aint, ae in zip(_cols_list, _types, _counts, _avg_imp, _avg_inter, _avg_eng):
-                    _dot = _type_colors.get(t, (_default_solid, _default_fade))[0]
-                    col_w.markdown(
-                        f'<div style="background:{_bg};border:{_brd};border-radius:12px;padding:0.8rem 1rem;text-align:center;">'
-                        f'<div style="font-size:0.8rem;font-weight:700;color:{_dot};margin-bottom:0.4rem;">● {t}</div>'
-                        f'<div style="font-size:0.68rem;color:{_lc};">Publications</div>'
-                        f'<div style="font-size:1.1rem;font-weight:800;color:{_vc};">{cnt}</div>'
-                        f'<div style="font-size:0.68rem;color:{_lc};margin-top:0.3rem;">Impressions moy.</div>'
-                        f'<div style="font-size:0.95rem;font-weight:700;color:{_vc};">{ai_v:,}</div>'
-                        f'<div style="font-size:0.68rem;color:{_lc};margin-top:0.3rem;">Taux d\'eng.</div>'
-                        f'<div style="font-size:0.95rem;font-weight:700;color:#facc15;">{ae}%</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-
-            with st.expander("📋 Toutes les publications"):
-                posts_df = pd.DataFrame(ig_posts)
-                _ig_cols = ["created_time", "text", "media_type", "impressions", "reactions", "comments", "shares", "total_interactions"]
-                st.dataframe(
-                    posts_df[[c for c in _ig_cols if c in posts_df.columns]],
-                    use_container_width=True,
-                )
-        else:
-            st.info("No post data available.")
