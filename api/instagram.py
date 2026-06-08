@@ -325,30 +325,27 @@ def fetch_ig_posts(days: int = None, start: str = None, end: str = None, limit: 
                 media_type in ("REEL", "IG_REEL")
                 or "/reel/" in p.get("permalink", "")
             )
-            # Metric sets follow the documented endpoint:
-            #   /{media_id}?fields=insights.metric(impressions,views,plays)
-            # `views` is the v22+ metric for image/carousel total affichages.
-            # `impressions` is tried first (works for VIDEO); on 400 the waterfall
-            # progresses to `views` alone, then reach-only as last resort.
+            # `views` is confirmed working for ALL post types (IMAGE, CAROUSEL, REEL, VIDEO).
+            # Confirmed from live API tests:
+            #   IMAGE    → views=1110  (impressions=400 deprecated, plays=400 invalid)
+            #   CAROUSEL → views=4531  (impressions=400 deprecated)
+            #   REEL     → views=2354  (plays=400 deprecated, impressions=400 not supported)
+            # `video_views` kept for VIDEO as it measures plays ≥3s (more meaningful for video).
             if is_reel:
                 metric_sets = [
-                    "plays,views,reach,saved,shares,total_interactions",
                     "views,reach,saved,shares,total_interactions",
                     "reach,saved,shares,total_interactions",
                     "reach,saved",
                 ]
             elif media_type == "VIDEO":
                 metric_sets = [
-                    "impressions,views,video_views,reach,saved,shares,total_interactions",
-                    "views,video_views,reach,saved,shares,total_interactions",
-                    "reach,saved,shares,total_interactions",
+                    "video_views,views,reach,saved,shares,total_interactions",
+                    "views,reach,saved,shares,total_interactions",
                     "reach,saved",
                 ]
             else:
-                # IMAGE / CAROUSEL_ALBUM
-                # `impressions` deprecated in v22+; `views` is the replacement metric.
+                # IMAGE / CAROUSEL_ALBUM — `views` is the only view-count metric in v22+
                 metric_sets = [
-                    "impressions,views,reach,saved,shares,total_interactions",
                     "views,reach,saved,shares,total_interactions",
                     "reach,saved,shares,total_interactions",
                     "reach,saved",
@@ -468,23 +465,15 @@ def fetch_ig_post_totals(days: int = None, start: str = None, end: str = None) -
             break
         params = {**params, "after": next_cursor}
 
-    def _get_reach_per_post(p):
+    def _get_views_per_post(p):
         """
-        Return the visibility count for a single post.
+        Return the view count for a single post — used to total the 📢 Vues KPI.
 
-        ── Why reach and not impressions? ──────────────────────────────────────
-        Meta deprecated the `impressions` metric for IMAGE and CAROUSEL posts
-        from API v22+. It returns a 400 error for those post types — the metric
-        simply no longer exists. `plays` is also deprecated for Reels in v22+.
-
-        `reach` (unique accounts that saw the post) is the only per-post
-        visibility metric that still works for ALL post types. It is a different
-        metric from impressions (reach is deduplicated, impressions counts repeat
-        views), but it is the only real number Meta still provides.
-
-        The KPI in the UI is therefore labelled "Couverture (Posts)" / reach,
-        not impressions — to reflect what is actually being measured.
-        ────────────────────────────────────────────────────────────────────────
+        Confirmed working metrics per post type (live API test, v19 / v22 rules):
+          IMAGE    → `views`       (impressions=400 deprecated, plays=400 invalid)
+          CAROUSEL → `views`       (impressions=400 deprecated)
+          REEL     → `views`       (plays=400 deprecated, impressions=400 unsupported)
+          VIDEO    → `video_views` preferred (plays ≥3s), then `views`, then `reach`
         """
         post_id    = p["id"]
         media_type = p.get("media_type", "")
@@ -492,15 +481,12 @@ def fetch_ig_post_totals(days: int = None, start: str = None, end: str = None) -
             media_type in ("REEL", "IG_REEL")
             or "/reel/" in p.get("permalink", "")
         )
-        # Follows documented endpoint: /{media_id}?fields=insights.metric(impressions,views,plays)
-        # `views` = v22+ unified view count, replaces `impressions` for IMAGE/CAROUSEL.
-        if is_reel:
-            metric_sets = ["plays,views,reach", "views,reach", "reach"]
-        elif media_type == "VIDEO":
-            metric_sets = ["video_views,views,reach", "views,reach", "reach"]
+        if is_reel or media_type not in ("VIDEO",):
+            # IMAGE / CAROUSEL / REEL — `views` is the only view metric in v22+
+            metric_sets = ["views,reach", "reach"]
         else:
-            # IMAGE / CAROUSEL: try impressions+views first, then views alone
-            metric_sets = ["impressions,views,reach", "views,reach", "reach"]
+            # VIDEO: video_views (plays ≥3s) is more meaningful; views as fallback
+            metric_sets = ["video_views,views,reach", "views,reach", "reach"]
 
         for m_list in metric_sets:
             try:
@@ -510,8 +496,7 @@ def fetch_ig_post_totals(days: int = None, start: str = None, end: str = None) -
                     name = item.get("name", "")
                     v = (item["values"][0].get("value", 0)
                          if item.get("values") else item.get("value", 0))
-                    # Prefer view-count metrics; fall back to reach last
-                    if name in ("video_views", "plays", "impressions", "views"):
+                    if name in ("video_views", "views"):
                         val = max(val, v)
                     elif name == "reach" and val == 0:
                         val = v
@@ -529,16 +514,14 @@ def fetch_ig_post_totals(days: int = None, start: str = None, end: str = None) -
 
     if all_posts:
         with ThreadPoolExecutor(max_workers=20) as executor:
-            results = list(executor.map(_get_reach_per_post, all_posts))
+            results = list(executor.map(_get_views_per_post, all_posts))
         total_reach = sum(results)
 
     print(f"DEBUG fetch_ig_post_totals: {total_posts} posts, {total_reach} total views")
     return {
         "total_posts":  total_posts,
-        # Sum of per-post view counts across all posts in the period.
-        # Uses `views` (v22+ metric) or `impressions`/`plays`/`video_views` per post type,
-        # falling back to `reach` only when no view-count metric is available.
-        # Matches documented endpoint: /{media_id}?fields=insights.metric(impressions,views,plays)
+        # Sum of per-post `views` across all posts in the period.
+        # `views` confirmed working for IMAGE, CAROUSEL, REEL, VIDEO (v22+).
         "total_impressions": total_reach,
     }
 
