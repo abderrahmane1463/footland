@@ -21,10 +21,6 @@ def get_ig_engagement(days, start=None, end=None):
 def get_ig_posts(days, start=None, end=None):
     return db.get_ig_posts(days, start, end)
 
-@st.cache_data(ttl=None, show_spinner=False)
-def get_ig_post_totals(days, start=None, end=None):
-    return db.get_ig_post_totals(days, start, end)
-
 
 # ─── Post card helper ─────────────────────────────────────────────────────────
 def _render_ig_post_card(post: dict):
@@ -123,7 +119,6 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
         "profile":      lambda: get_ig_profile(days, start_date, end_date),
         "eng":          lambda: get_ig_engagement(days, start_date, end_date),
         "posts":        lambda: get_ig_posts(days, start_date, end_date),
-        "post_totals":  lambda: get_ig_post_totals(days, start_date, end_date),
         "prev_profile": lambda: get_ig_profile(days, _prev_start, _prev_end),
     }
     fast = {}
@@ -137,11 +132,10 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
                 print(f"DEBUG ig fast fetch {key} error: {e}")
                 fast[key] = {} if key != "posts" else []
 
-    ig_profile     = fast["profile"]
-    ig_eng         = fast["eng"]
-    ig_posts       = fast["posts"]
-    ig_post_totals = fast.get("post_totals", {})
-    prev_profile   = fast.get("prev_profile", {})
+    ig_profile   = fast["profile"]
+    ig_eng       = fast["eng"]
+    ig_posts     = fast["posts"]
+    prev_profile = fast.get("prev_profile", {})
 
     followers          = ig_profile.get("followers_count") or 0
     follower_additions = ig_profile.get("follower_additions", [])
@@ -158,12 +152,9 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     _ig_reach_display = "—" if _ig_reach_unavailable else f"{total_ig_reach:,}"
     _ig_reach_note    = "ℹ️ Indisponible pour cette période" if _ig_reach_unavailable else None
 
-    # Prefer the full paginated total (all posts in period) from post_totals,
-    # fall back to summing the 20 displayed posts if post_totals is unavailable.
-    total_ig_impressions = (
-        ig_post_totals.get("total_impressions")
-        or sum(p.get("impressions", 0) for p in ig_posts)
-    )
+    # Account-level views — single API call: /{ig_user_id}/insights?metric=views
+    # &period=day&metric_type=total_value — covers posts + reels + stories.
+    total_ig_views = ig_eng.get("views", 0)
 
     # Use account-level insights (metric_type=total_value) — covers ALL posts in the period,
     # not just the 20 shown in the Top Content tab. Falls back to per-post sums only if
@@ -194,7 +185,7 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     _prev_followers  = prev_profile.get("followers_count") or 0
     _prev_ig_reach   = prev_profile.get("period_reach", 0) or safe_sum(prev_profile.get("reach", []))
     # prev_posts loads in phase 2 — engagement deltas computed after charts render
-    _prev_ig_impr         = 0
+    _prev_ig_views        = 0
     _prev_ig_likes        = 0
     _prev_ig_comments     = 0
     _prev_ig_shares       = 0
@@ -245,7 +236,7 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-bottom:0.6rem;">
   {_ig_kpi("👁️", "Couvertures",        _ig_reach_display, note=_ig_reach_note,
            delta=None if _ig_reach_unavailable else _d(total_ig_reach, _prev_ig_reach))}
-  {_ig_kpi("📢", "Impressions (Posts)", f"{total_ig_impressions:,}", delta=_d(total_ig_impressions, _prev_ig_impr))}
+  {_ig_kpi("👁️", "Vues",               f"{total_ig_views:,}",      delta=_d(total_ig_views,       _prev_ig_views))}
   {_ig_kpi("🔖", "Enregistrements",    f"{total_ig_saves:,}", "#60a5fa", delta=_d(total_ig_saves,  _prev_ig_saves))}
 </div>
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin-bottom:1rem;">
