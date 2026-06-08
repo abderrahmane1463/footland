@@ -217,15 +217,17 @@ def fetch_ig_engagement(days: int, start: str = None, end: str = None) -> dict:
     except:
         since_ts, until_ts = since, until
 
-    result = {"likes": 0, "comments": 0, "shares": 0, "saves": 0, "daily": []}
+    result = {"likes": 0, "comments": 0, "shares": 0, "saves": 0, "total_interactions": 0, "daily": []}
 
-    # v22+: likes/comments/shares/saves require metric_type=total_value for aggregation.
-    # We fetch the period total first, then try metric_type=time_series for the daily chart.
+    # v22+: all engagement metrics require metric_type=total_value for period aggregation.
+    # total_interactions is fetched directly from the API — it differs slightly from
+    # likes+comments+shares+saves because Meta may include additional interaction types.
     metric_map = {
-        "likes":    "likes",
-        "comments": "comments",
-        "shares":   "shares",
-        "saves":    "saves",
+        "likes":              "likes",
+        "comments":           "comments",
+        "shares":             "shares",
+        "saves":              "saves",
+        "total_interactions": "total_interactions",
     }
 
     # ── 1. Period totals (metric_type=total_value) ─────────────────────────────

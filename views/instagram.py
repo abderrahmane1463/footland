@@ -165,11 +165,18 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
         or sum(p.get("impressions", 0) for p in ig_posts)
     )
 
-    total_ig_likes    = sum(p.get("reactions", 0) for p in ig_posts)
-    total_ig_comments = sum(p.get("comments", 0) for p in ig_posts)
-    total_ig_shares   = sum(p.get("shares", 0) for p in ig_posts)
-    total_ig_saves    = sum(p.get("saves", 0) for p in ig_posts)
-    total_ig_interactions = total_ig_likes + total_ig_comments + total_ig_shares + total_ig_saves
+    # Use account-level insights (metric_type=total_value) — covers ALL posts in the period,
+    # not just the 20 shown in the Top Content tab. Falls back to per-post sums only if
+    # the account insights call returned 0 (e.g. API error or very short period).
+    total_ig_likes    = ig_eng.get("likes",    0) or sum(p.get("reactions", 0) for p in ig_posts)
+    total_ig_comments = ig_eng.get("comments", 0) or sum(p.get("comments",  0) for p in ig_posts)
+    total_ig_shares   = ig_eng.get("shares",   0) or sum(p.get("shares",    0) for p in ig_posts)
+    total_ig_saves    = ig_eng.get("saves",    0) or sum(p.get("saves",     0) for p in ig_posts)
+    # total_interactions fetched directly from API (may differ slightly from the sum above)
+    total_ig_interactions = (
+        ig_eng.get("total_interactions", 0)
+        or (total_ig_likes + total_ig_comments + total_ig_shares + total_ig_saves)
+    )
 
     ig_eng_rate = (
         round(total_ig_interactions / total_ig_reach * 100, 2)
