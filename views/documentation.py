@@ -83,7 +83,7 @@ def render_documentation():
     st.markdown("""
 <div class="doc-hero">
   <h1>📖 Guide du Dashboard</h1>
-  <p>Ce guide explique chaque indicateur (KPI) affiché dans le dashboard Footland — ce qu'il mesure, comment il est calculé, et l'endpoint Meta API utilisé pour le récupérer.</p>
+  <p>Ce guide explique chaque indicateur (KPI) affiché dans le dashboard Footland — ce qu'il mesure et comment il est calculé.</p>
 </div>
 """, unsafe_allow_html=True)
 
