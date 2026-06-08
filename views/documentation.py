@@ -179,54 +179,42 @@ def render_documentation():
     # ── Instagram ─────────────────────────────────────────────────────────────
     st.markdown('<div class="doc-section-title">📸 Instagram</div>', unsafe_allow_html=True)
 
-    i1, i2, i3, i4 = st.tabs(["Vue d'ensemble", "📡 Visibilité", "💬 Engagement", "🏆 Top Contenu"])
+    i1, i2, i3 = st.tabs(["Vue d'ensemble", "📡 Visibilité", "💬 Engagement"])
 
     with i1:
         st.markdown("""
 <table class="kpi-table">
   <tr><th>Indicateur</th><th>Description</th><th>Endpoint</th></tr>
   <tr><td class="kpi-name">👥 Followers</td><td class="kpi-desc">Total abonnés au compte Instagram.</td><td><span class="endpoint">/{ig_user_id}?fields=followers_count</span></td></tr>
-  <tr><td class="kpi-name">📝 Publications</td><td class="kpi-desc">Nombre de posts publiés.</td><td><span class="endpoint">/{ig_user_id}/media?fields=id,timestamp,…</span></td></tr>
-  <tr><td class="kpi-name">📊 Taux d'engagement</td><td class="kpi-desc">Total interactions ÷ portée × 100.</td><td><span class="endpoint">Calculé</span></td></tr>
-  <tr><td class="kpi-name">👁️ Couvertures (Reach)</td><td class="kpi-desc">Comptes uniques ayant vu au moins un post.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=reach&period=day</span></td></tr>
-  <tr><td class="kpi-name">📢 Impressions (Posts)</td><td class="kpi-desc">Total affichages calculé depuis chaque post individuellement.</td><td><span class="endpoint">/{media_id}?fields=insights.metric(impressions)</span></td></tr>
-  <tr><td class="kpi-name">🔖 Enregistrements</td><td class="kpi-desc">Posts sauvegardés par des utilisateurs.</td><td><span class="endpoint">/{media_id}?fields=insights.metric(saved)</span></td></tr>
-  <tr><td class="kpi-name">🔥 Total interactions</td><td class="kpi-desc">Likes + commentaires + partages + enregistrements.</td><td><span class="endpoint">Calculé depuis les métriques de chaque post</span></td></tr>
-  <tr><td class="kpi-name">❤️ Réactions</td><td class="kpi-desc">Total des J'aime sur les posts.</td><td><span class="endpoint">/{media_id}?fields=insights.metric(total_likes)</span></td></tr>
-  <tr><td class="kpi-name">💬 Commentaires</td><td class="kpi-desc">Total des commentaires sur les posts.</td><td><span class="endpoint">/{media_id}?fields=insights.metric(total_comments)</span></td></tr>
-  <tr><td class="kpi-name">↗️ Partages</td><td class="kpi-desc">Posts partagés (Stories, DMs, etc.).</td><td><span class="endpoint">/{media_id}?fields=insights.metric(shares)</span></td></tr>
+  <tr><td class="kpi-name">📝 Publications</td><td class="kpi-desc">Nombre de posts publiés sur la période.</td><td><span class="endpoint">/{ig_user_id}/media?fields=id,timestamp,…</span></td></tr>
+  <tr><td class="kpi-name">📊 Taux d'engagement</td><td class="kpi-desc">Total interactions ÷ couverture × 100.</td><td><span class="endpoint">Calculé</span></td></tr>
+  <tr><td class="kpi-name">👁️ Couvertures (Reach)</td><td class="kpi-desc">Comptes uniques ayant vu au moins un contenu. Indisponible si période > 30 jours.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=reach&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">👁️ Vues</td><td class="kpi-desc">Total affichages de tous les contenus (posts + reels + stories). Un seul appel API agrégé.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=views&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">🔖 Enregistrements</td><td class="kpi-desc">Total des sauvegardes sur tous les posts de la période.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=saves&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">🔥 Total interactions</td><td class="kpi-desc">Likes + commentaires + partages + enregistrements. Valeur directe de l'API Meta (non filtrée).</td><td><span class="endpoint">/{ig_user_id}/insights?metric=total_interactions&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">❤️ Réactions</td><td class="kpi-desc">Total des likes sur tous les posts de la période.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=likes&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">💬 Commentaires</td><td class="kpi-desc">Total des commentaires sur tous les posts.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=comments&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">↗️ Partages</td><td class="kpi-desc">Total des partages (Stories, DMs, etc.).</td><td><span class="endpoint">/{ig_user_id}/insights?metric=shares&period=day&metric_type=total_value</span></td></tr>
 </table>""", unsafe_allow_html=True)
 
     with i2:
         st.markdown("""
 <table class="kpi-table">
   <tr><th>Indicateur</th><th>Description</th><th>Endpoint</th></tr>
-  <tr><td class="kpi-name">👁️ Total Reach</td><td class="kpi-desc">Comptes uniques touchés par les posts.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=reach&period=day</span></td></tr>
-  <tr><td class="kpi-name">🎯 Pic</td><td class="kpi-desc">Meilleure journée en portée ou impressions.</td><td><span class="endpoint">Calculé depuis la série journalière</span></td></tr>
-  <tr><td class="kpi-name">📏 Moy. journalière</td><td class="kpi-desc">Moyenne par jour sur la période.</td><td><span class="endpoint">Calculé depuis la série journalière</span></td></tr>
-  <tr><td class="kpi-name">📊 Total Impressions</td><td class="kpi-desc">Somme affichages depuis les métriques de chaque post.</td><td><span class="endpoint">/{media_id}?fields=insights.metric(impressions,views,plays)</span></td></tr>
+  <tr><td class="kpi-name">👁️ Total Reach</td><td class="kpi-desc">Comptes uniques touchés sur la période (dédupliqué).</td><td><span class="endpoint">/{ig_user_id}/insights?metric=reach&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">🎯 Pic</td><td class="kpi-desc">Meilleure journée en portée sur la période.</td><td><span class="endpoint">Calculé depuis la série journalière</span></td></tr>
+  <tr><td class="kpi-name">📏 Moy. journalière</td><td class="kpi-desc">Moyenne de portée par jour sur la période.</td><td><span class="endpoint">Calculé depuis la série journalière</span></td></tr>
 </table>""", unsafe_allow_html=True)
 
     with i3:
         st.markdown("""
 <table class="kpi-table">
   <tr><th>Indicateur</th><th>Description</th><th>Endpoint</th></tr>
-  <tr><td class="kpi-name">🔥 Total interactions</td><td class="kpi-desc">Likes + commentaires + enregistrements.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=likes,comments,shares,saves</span></td></tr>
-  <tr><td class="kpi-name">❤️ Réactions</td><td class="kpi-desc">Total des likes sur tous les posts.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=likes&period=day</span></td></tr>
-  <tr><td class="kpi-name">💬 Commentaires</td><td class="kpi-desc">Total des commentaires sur tous les posts.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=comments&period=day</span></td></tr>
-  <tr><td class="kpi-name">🔖 Enregistrements</td><td class="kpi-desc">Total des sauvegardes.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=saves&period=day</span></td></tr>
-</table>""", unsafe_allow_html=True)
-
-    with i4:
-        st.markdown("""
-<p style="color:#a1a1aa;font-size:14px;">Podium Top #3 par vues et Top #3 par engagement. Chaque carte affiche :</p><br>
-<table class="kpi-table">
-  <tr><th>Métrique carte</th><th>Description</th><th>Endpoint</th></tr>
-  <tr><td class="kpi-name">👁️ Vues</td><td class="kpi-desc">Total affichages du post (impressions).</td><td><span class="endpoint">/{media_id}?fields=insights.metric(impressions,views,plays)</span></td></tr>
-  <tr><td class="kpi-name">❤️ Réactions</td><td class="kpi-desc">Total des likes sur le post.</td><td><span class="endpoint">/{media_id}?fields=insights.metric(total_likes)</span></td></tr>
-  <tr><td class="kpi-name">💬 Commentaires</td><td class="kpi-desc">Total des commentaires.</td><td><span class="endpoint">/{media_id}?fields=insights.metric(total_comments)</span></td></tr>
-  <tr><td class="kpi-name">🔖 Enregistrements</td><td class="kpi-desc">Nombre de fois que le post a été sauvegardé.</td><td><span class="endpoint">/{media_id}?fields=insights.metric(saved)</span></td></tr>
-  <tr><td class="kpi-name">↗️ Partages</td><td class="kpi-desc">Partages (Stories, DMs, etc.).</td><td><span class="endpoint">/{media_id}?fields=insights.metric(shares)</span></td></tr>
+  <tr><td class="kpi-name">🔥 Total interactions</td><td class="kpi-desc">Likes + commentaires + partages + enregistrements sur la période.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=total_interactions&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">❤️ Réactions</td><td class="kpi-desc">Total des likes sur tous les posts.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=likes&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">💬 Commentaires</td><td class="kpi-desc">Total des commentaires sur tous les posts.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=comments&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">🔖 Enregistrements</td><td class="kpi-desc">Total des sauvegardes sur tous les posts.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=saves&period=day&metric_type=total_value</span></td></tr>
+  <tr><td class="kpi-name">↗️ Partages</td><td class="kpi-desc">Total des partages sur tous les posts.</td><td><span class="endpoint">/{ig_user_id}/insights?metric=shares&period=day&metric_type=total_value</span></td></tr>
 </table>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -452,12 +440,12 @@ Ce n'est pas une erreur du dashboard — ce sont des contraintes imposées par l
 | 📊 **Taux d'engagement** | Affiche **—** quand la portée est indisponible | Formule = Interactions ÷ Portée — impossible sans portée |
 """)
 
-        st.markdown("#### 📢 Impressions & Enregistrements")
+        st.markdown("#### 👁️ Vues & Enregistrements")
         st.markdown("""
 | KPI | Limitation | Détail |
 |---|---|---|
-| 📢 **Impressions** (Instagram) | **Stories non incluses** | L'API Meta supprime les données Stories après 24h — seuls le feed et les Reels sont comptabilisés |
-| 🔖 **Enregistrements** | Peut différer de Meta Business Suite | Business Suite inclut les Stories enregistrées ; le dashboard comptabilise uniquement les posts du feed & Reels |
+| 👁️ **Vues** (Instagram) | Inclut les données publicitaires | Le metric `views` de l'API Meta agrège posts organiques + reels + stories + contenus sponsorisés. Pas de filtre organique disponible. |
+| 🔖 **Enregistrements** | Peut différer de Meta Business Suite | Business Suite peut inclure des enregistrements de contenus supprimés ou archivés |
 | 📢 **Impressions** (Facebook) | Basé sur `post_impressions_unique` | Pour les pages New Page Experience, Meta n'expose que la portée unique par post, pas les impressions brutes |
 """)
 
