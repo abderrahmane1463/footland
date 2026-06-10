@@ -189,192 +189,232 @@ def _build_msgs_html(history, dark: bool = True) -> str:
     if not history:
         _empty_c = "rgba(255,255,255,0.35)" if dark else "#9ca3af"
         return (
-            f'<div style="text-align:center;color:{_empty_c};font-size:0.85rem;'
-            f'padding:2rem 1rem;line-height:1.5;">'
-            f'👋 Bonjour ! Je suis l\'assistant IA Footland.<br>'
+            f'<div style="display:flex;gap:9px;align-items:flex-start;">'
+            f'<div style="width:30px;height:30px;border-radius:50%;'
+            f'background:linear-gradient(135deg,#E8420A,#C1320A);'
+            f'display:flex;align-items:center;justify-content:center;'
+            f'flex-shrink:0;font-size:15px;">🤖</div>'
+            f'<div style="background:{"rgba(255,255,255,0.08)" if dark else "#f1f5f9"};'
+            f'color:{_empty_c};padding:0.6rem 0.8rem;border-radius:4px 16px 16px 16px;'
+            f'font-size:0.85rem;line-height:1.6;max-width:86%;">'
+            f'👋 <strong>Bonjour !</strong> Je suis l\'assistant IA Footland.<br>'
             f'Posez-moi une question sur les statistiques affichées.</div>'
+            f'</div>'
         )
+
+    bot_bg = "rgba(255,255,255,0.08)" if dark else "#f1f5f9"
+    bot_tc = "#ffffff" if dark else "#111827"
 
     bubbles = []
     for msg in history:
         is_user = msg.get("role") == "user"
         content = _md_to_html(msg.get("content", ""))
         if is_user:
-            bg, color, align, radius = "#E8420A", "#ffffff", "flex-end", "14px 14px 2px 14px"
+            bubbles.append(
+                f'<div style="display:flex;gap:9px;align-items:flex-start;'
+                f'justify-content:flex-end;margin-bottom:0.6rem;">'
+                f'<div style="background:linear-gradient(135deg,#E8420A,#C1320A);color:#fff;'
+                f'padding:0.6rem 0.8rem;border-radius:16px 4px 16px 16px;'
+                f'font-size:0.85rem;line-height:1.6;max-width:86%;word-wrap:break-word;">{content}</div>'
+                f'<div style="width:30px;height:30px;border-radius:50%;background:#444;flex-shrink:0;'
+                f'display:flex;align-items:center;justify-content:center;font-size:15px;">👤</div>'
+                f'</div>'
+            )
         else:
-            bg = "rgba(255,255,255,0.08)" if dark else "#f1f5f9"
-            color = "#ffffff" if dark else "#111827"
-            align, radius = "flex-start", "14px 14px 14px 2px"
-        bubbles.append(
-            f'<div style="display:flex;justify-content:{align};margin-bottom:0.5rem;">'
-            f'<div style="background:{bg};color:{color};padding:0.5rem 0.8rem;'
-            f'border-radius:{radius};max-width:85%;font-size:0.85rem;'
-            f'line-height:1.45;word-wrap:break-word;">{content}</div>'
-            f'</div>'
-        )
+            bubbles.append(
+                f'<div style="display:flex;gap:9px;align-items:flex-start;margin-bottom:0.6rem;">'
+                f'<div style="width:30px;height:30px;border-radius:50%;'
+                f'background:linear-gradient(135deg,#E8420A,#C1320A);'
+                f'display:flex;align-items:center;justify-content:center;'
+                f'flex-shrink:0;font-size:15px;">🤖</div>'
+                f'<div style="background:{bot_bg};color:{bot_tc};padding:0.6rem 0.8rem;'
+                f'border-radius:4px 16px 16px 16px;font-size:0.85rem;line-height:1.6;'
+                f'max-width:86%;word-wrap:break-word;">{content}</div>'
+                f'</div>'
+            )
     return "".join(bubbles)
 
 
 # ─── Floating chat panel ──────────────────────────────────────────────────────
 def render_chatbot():
     """Render the floating AI assistant panel (only call when chat_open is True)."""
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
     _dark = st.session_state.get("theme", "dark") == "dark"
     _bg       = "#161616" if _dark else "#ffffff"
     _border   = "#262626" if _dark else "#e5e7eb"
     _input_bg = "rgba(255,255,255,0.06)" if _dark else "#f3f4f6"
     _text_c   = "#ffffff" if _dark else "#111827"
+    _ph_c     = "rgba(255,255,255,0.35)" if _dark else "#9ca3af"
+
+    msgs_html = _build_msgs_html(st.session_state.chat_history, _dark)
 
     st.markdown(
         f"""
 <style>
-.st-key-fl_chatbot_container {{
-    position: fixed !important;
-    bottom: 96px !important;
-    right: 16px !important;
-    top: auto !important;
-    left: auto !important;
-    width: 360px !important;
-    max-width: calc(100vw - 24px) !important;
-    height: 520px !important;
-    max-height: 520px !important;
-    min-height: 0 !important;
-    z-index: 9999 !important;
-    background: {_bg} !important;
-    border: 1px solid {_border} !important;
-    border-radius: 16px !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45) !important;
-    overflow: hidden !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 0 !important;
+#fl-chat-panel {{
+    position: fixed;
+    bottom: 76px;
+    right: 16px;
+    width: 360px;
+    max-width: calc(100vw - 24px);
+    height: 480px;
+    max-height: 70vh;
+    background: {_bg};
+    border: 1px solid {_border};
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 32px rgba(0,0,0,0.35);
+    z-index: 9000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: flChatIn .25s cubic-bezier(.34,1.56,.64,1) both;
 }}
-
-/* Header row (title + close button) — only the row containing .fl-chat-title */
-.st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:has(.fl-chat-title) {{
-    flex: 0 0 auto !important;
+@keyframes flChatIn {{
+    from {{ opacity: 0; transform: translateY(18px) scale(.96); }}
+    to   {{ opacity: 1; transform: translateY(0) scale(1); }}
+}}
+#fl-chat-hdr {{
     background: linear-gradient(90deg, #E8420A, #C1320A);
+    padding: 0.6rem 0.8rem;
+    flex-shrink: 0;
+    display: flex;
     align-items: center;
-    padding: 0.55rem 0.8rem;
+    gap: 0.5rem;
 }}
-.st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:has(.fl-chat-title) [data-testid="stMarkdownContainer"] p {{
-    color: #ffffff !important;
+#fl-chat-hdr span.fl-chat-title {{
+    color: #ffffff;
     font-weight: 700;
     font-size: 0.95rem;
-    margin: 0;
-}}
-.st-key-fl_chat_close button {{
-    background: transparent !important;
-    border: none !important;
-    color: #ffffff !important;
-    font-size: 1.1rem !important;
-    line-height: 1 !important;
-    padding: 0.2rem 0.5rem !important;
-    min-height: unset !important;
-    box-shadow: none !important;
-    float: right;
-}}
-.st-key-fl_chat_close button:hover {{
-    background: rgba(255,255,255,0.18) !important;
 }}
 
-/* Scrollable messages area — middle, takes remaining space */
-.st-key-fl_chatbot_container [data-testid="stElementContainer"]:has(.fl-chat-messages) {{
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    max-height: 100% !important;
-    height: 0 !important;
-    overflow: hidden !important;
-}}
-.st-key-fl_chatbot_container [data-testid="stElementContainer"]:has(.fl-chat-messages) [data-testid="stMarkdownContainer"] {{
-    height: 100% !important;
-    max-height: 100% !important;
-    overflow: hidden !important;
-}}
-.fl-chat-messages {{
-    display: block !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    overflow-y: auto !important;
+/* Scrollable messages area */
+#fl-chat-messages {{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
     padding: 0.7rem;
     scrollbar-width: thin;
     scrollbar-color: #E8420A transparent;
 }}
-.fl-chat-messages::-webkit-scrollbar {{
+#fl-chat-messages::-webkit-scrollbar {{
     width: 6px;
 }}
-.fl-chat-messages::-webkit-scrollbar-track {{
+#fl-chat-messages::-webkit-scrollbar-track {{
     background: transparent;
 }}
-.fl-chat-messages::-webkit-scrollbar-thumb {{
+#fl-chat-messages::-webkit-scrollbar-thumb {{
     background-color: #E8420A;
     border-radius: 3px;
 }}
-.fl-chat-messages::-webkit-scrollbar-thumb:hover {{
+#fl-chat-messages::-webkit-scrollbar-thumb:hover {{
     background-color: #FF6B35;
 }}
 
-/* Input row (form) — pinned at the bottom of the panel */
-.st-key-fl_chatbot_container [data-testid="stForm"] {{
-    flex: 0 0 auto !important;
-    border: none;
-    border-top: 1px solid {_border};
-    padding: 0.5rem 0.6rem;
-    background: transparent;
-    margin: 0 !important;
+/* Close button overlay, pinned to the panel header */
+.st-key-fl_chat_close_wrap {{
+    position: fixed !important;
+    bottom: calc(76px + 480px - 42px) !important;
+    right: 22px !important;
+    z-index: 9002 !important;
+    width: 28px !important;
+    height: 28px !important;
 }}
-.st-key-fl_chatbot_container [data-testid="stForm"] [data-testid="stTextInput"] input {{
+.st-key-fl_chat_close_wrap button {{
+    background: rgba(255,255,255,0.18) !important;
+    border: none !important;
+    border-radius: 50% !important;
+    color: #ffffff !important;
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    min-height: unset !important;
+    font-size: 0.85rem !important;
+    line-height: 1 !important;
+    box-shadow: none !important;
+}}
+.st-key-fl_chat_close_wrap button:hover {{
+    background: rgba(255,255,255,0.32) !important;
+}}
+
+/* Make the global bottom bar transparent / click-through except the input itself */
+[data-testid="stBottom"] {{
+    background: transparent !important;
+    pointer-events: none !important;
+}}
+[data-testid="stBottom"] * {{
+    pointer-events: auto !important;
+}}
+[data-testid="stBottomBlockContainer"] {{
+    background: transparent !important;
+}}
+
+/* Chat input pinned directly under the floating panel */
+[data-testid="stChatInput"] {{
+    position: fixed !important;
+    bottom: 0 !important;
+    right: 16px !important;
+    left: auto !important;
+    width: 360px !important;
+    max-width: calc(100vw - 24px) !important;
+    z-index: 9001 !important;
+    background: {_bg} !important;
+    border: 1px solid {_border} !important;
+    border-radius: 0 0 16px 16px !important;
+    padding: 0.5rem 0.6rem !important;
+    margin: 0 !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45) !important;
+}}
+[data-testid="stChatInput"] textarea {{
     background: {_input_bg} !important;
     color: {_text_c} !important;
-    border-radius: 20px !important;
+    border-radius: 12px !important;
     border: 1px solid {_border} !important;
 }}
-.st-key-fl_chatbot_container [data-testid="stForm"] [data-testid="baseButton-secondaryFormSubmit"],
-.st-key-fl_chatbot_container [data-testid="stForm"] button[kind="secondaryFormSubmit"] {{
-    border-radius: 50% !important;
-    width: 2.4rem !important;
-    height: 2.4rem !important;
-    padding: 0 !important;
+[data-testid="stChatInput"] textarea::placeholder {{
+    color: {_ph_c} !important;
 }}
-.st-key-fl_chatbot_container [data-testid="InputInstructions"] {{
-    display: none !important;
+[data-testid="stChatInput"] button {{
+    background: linear-gradient(135deg, #E8420A, #C1320A) !important;
+    border-radius: 10px !important;
+    border: none !important;
 }}
 
 @media (max-width: 480px) {{
-    .st-key-fl_chatbot_container {{
-        width: calc(100vw - 16px);
-        right: 8px;
-        bottom: 84px;
-        height: 70vh;
+    #fl-chat-panel,
+    [data-testid="stChatInput"] {{
+        width: calc(100vw - 16px) !important;
+        right: 8px !important;
+    }}
+    #fl-chat-panel {{
+        bottom: 124px;
+        height: 60vh;
+        max-height: 60vh;
+    }}
+    .st-key-fl_chat_close_wrap {{
+        bottom: calc(124px + 60vh - 42px) !important;
+        right: 14px !important;
     }}
 }}
 </style>
+
+<div id="fl-chat-panel">
+  <div id="fl-chat-hdr">
+    <span style="font-size:1.1rem;">🤖</span>
+    <span class="fl-chat-title">Assistant IA Footland</span>
+  </div>
+  <div id="fl-chat-messages">{msgs_html}</div>
+</div>
 """,
         unsafe_allow_html=True,
     )
 
-    with st.container(key="fl_chatbot_container"):
-        hcol1, hcol2 = st.columns([6, 1])
-        with hcol1:
-            st.markdown('<span class="fl-chat-title">🤖 <b>Assistant IA Footland</b></span>', unsafe_allow_html=True)
-        with hcol2:
-            if st.button("✕", key="fl_chat_close"):
-                st.session_state.chat_open = False
-                st.rerun()
-
-        msgs_html = _build_msgs_html(st.session_state.get("chat_history", []), _dark)
-        st.markdown(f'<div class="fl-chat-messages" id="fl-chat-messages">{msgs_html}</div>', unsafe_allow_html=True)
-
-        with st.form("fl_chat_form", clear_on_submit=True, border=False):
-            fcol1, fcol2 = st.columns([6, 1])
-            with fcol1:
-                user_msg = st.text_input(
-                    "message", placeholder="Posez votre question...",
-                    label_visibility="collapsed", key="fl_chat_text",
-                )
-            with fcol2:
-                sent = st.form_submit_button("➤")
+    with st.container(key="fl_chat_close_wrap"):
+        if st.button("✕", key="fl_chat_close"):
+            st.session_state.chat_open = False
+            st.rerun()
 
     # Auto-scroll the messages area to the bottom after each render
     st.components.v1.html(
@@ -388,8 +428,9 @@ def render_chatbot():
         height=0,
     )
 
-    if sent and user_msg and user_msg.strip():
-        st.session_state.chat_history.append({"role": "user", "content": user_msg.strip()})
+    prompt = st.chat_input("Posez votre question...", key="fl_chat_input")
+    if prompt and prompt.strip():
+        st.session_state.chat_history.append({"role": "user", "content": prompt.strip()})
         with st.spinner("L'assistant réfléchit..."):
             reply = _get_groq_response(st.session_state.chat_history)
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
