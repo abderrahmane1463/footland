@@ -5,69 +5,91 @@ views/documentation.py — Guide du dashboard Footland.
 import streamlit as st
 
 
-_DOC_CSS = """
+def _doc_css(dark: bool = True) -> str:
+    """Theme-aware CSS for the documentation tab, matching the rest of the dashboard."""
+    if dark:
+        hero_bg     = "linear-gradient(135deg, #161616 0%, #1a0f0a 100%)"
+        border      = "#262626"
+        muted       = "#a1a1aa"
+        label       = "#71717a"
+        text        = "#e4e4e7"
+        row_border  = "#1a1a1a"
+        row_hover   = "#1a1a1a"
+        endpoint_bg = "#1e1e1e"
+    else:
+        hero_bg     = "linear-gradient(135deg, #ffffff 0%, #fff5f0 100%)"
+        border      = "#e5e7eb"
+        muted       = "#6b7280"
+        label       = "#6b7280"
+        text        = "#111827"
+        row_border  = "#f1f5f9"
+        row_hover   = "#f9fafb"
+        endpoint_bg = "#f3f4f6"
+
+    return f"""
 <style>
-.doc-hero {
-    background: linear-gradient(135deg, #161616 0%, #1a0f0a 100%);
-    border: 1px solid #262626;
+.doc-hero {{
+    background: {hero_bg};
+    border: 1px solid {border};
     border-radius: 20px;
     padding: 40px 48px;
     margin-bottom: 32px;
-}
-.doc-hero h1 {
+}}
+.doc-hero h1 {{
     font-size: 32px;
     font-weight: 800;
     background: linear-gradient(90deg, #E8420A, #FF6B35);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-bottom: 8px;
-}
-.doc-hero p { color: #a1a1aa !important; font-size: 15px; }
-.doc-section-title {
+}}
+.doc-hero p {{ color: {muted} !important; font-size: 15px; }}
+.doc-section-title {{
     font-size: 20px;
     font-weight: 700;
     color: #E8420A !important;
     margin-bottom: 16px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #262626;
-}
-.kpi-table { width: 100%; border-collapse: collapse; }
-.kpi-table th {
+    border-bottom: 1px solid {border};
+}}
+.kpi-table {{ width: 100%; border-collapse: collapse; }}
+.kpi-table th {{
     text-align: left;
     padding: 10px 14px;
     font-size: 12px;
     font-weight: 600;
-    color: #71717a !important;
+    color: {label} !important;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    border-bottom: 1px solid #262626;
-}
-.kpi-table td {
+    border-bottom: 1px solid {border};
+}}
+.kpi-table td {{
     padding: 10px 14px;
     font-size: 14px;
-    color: #e4e4e7 !important;
-    border-bottom: 1px solid #1a1a1a;
+    color: {text} !important;
+    border-bottom: 1px solid {row_border};
     vertical-align: top;
-}
-.kpi-table tr:last-child td { border-bottom: none; }
-.kpi-table tr:hover td { background: #1a1a1a; }
-.kpi-name { font-weight: 600; white-space: nowrap; }
-.kpi-desc { color: #a1a1aa !important; }
-.endpoint {
+}}
+.kpi-table tr:last-child td {{ border-bottom: none; }}
+.kpi-table tr:hover td {{ background: {row_hover}; }}
+.kpi-name {{ font-weight: 600; white-space: nowrap; }}
+.kpi-desc {{ color: {muted} !important; }}
+.endpoint {{
     font-family: monospace;
     font-size: 12px;
-    background: #1e1e1e;
+    background: {endpoint_bg};
     color: #E8420A !important;
     padding: 2px 6px;
     border-radius: 4px;
     white-space: nowrap;
-}
+}}
 </style>
 """
 
 
 def render_documentation():
     _is_admin = st.session_state.get("user", {}).get("role") == "admin"
+    _dark = st.session_state.get("theme", "dark") == "dark"
 
     # Hide Endpoint column for viewers via CSS
     if not _is_admin:
@@ -78,7 +100,7 @@ def render_documentation():
 </style>
 """, unsafe_allow_html=True)
 
-    st.markdown(_DOC_CSS, unsafe_allow_html=True)
+    st.markdown(_doc_css(_dark), unsafe_allow_html=True)
 
     st.markdown("""
 <div class="doc-hero">
