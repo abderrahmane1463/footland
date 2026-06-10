@@ -227,7 +227,7 @@ def render_chatbot():
 <style>
 .st-key-fl_chatbot_container {{
     position: fixed !important;
-    bottom: 84px;
+    bottom: 96px;
     right: 16px;
     width: 360px;
     max-width: calc(100vw - 24px);
@@ -238,6 +238,23 @@ def render_chatbot():
     box-shadow: 0 8px 32px rgba(0,0,0,0.45);
     overflow: hidden;
     padding: 0 !important;
+}}
+
+/* Pin the chat input to the bottom of the screen, aligned under the panel */
+div[data-testid="stBottom"] {{
+    position: fixed !important;
+    inset: auto 16px 16px auto !important;
+    width: 360px !important;
+    max-width: calc(100vw - 24px) !important;
+    z-index: 9999 !important;
+}}
+div[data-testid="stBottom"] > div {{
+    background: {_bg} !important;
+    border: 1px solid {_border} !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45) !important;
+    max-width: 100% !important;
+    padding: 0.4rem !important;
 }}
 .st-key-fl_chatbot_container [data-testid="stVerticalBlockBorderWrapper"] {{
     border-radius: 16px;
@@ -278,7 +295,12 @@ def render_chatbot():
     .st-key-fl_chatbot_container {{
         width: calc(100vw - 16px);
         right: 8px;
-        bottom: 72px;
+        bottom: 84px;
+    }}
+    div[data-testid="stBottom"] {{
+        width: calc(100vw - 16px) !important;
+        right: 8px !important;
+        bottom: 8px !important;
     }}
 }}
 </style>
@@ -286,7 +308,7 @@ def render_chatbot():
         unsafe_allow_html=True,
     )
 
-    with st.container(height=480, key="fl_chatbot_container"):
+    with st.container(height=440, key="fl_chatbot_container"):
         st.markdown('<div class="fl-chat-header">🤖 Assistant IA Footland</div>', unsafe_allow_html=True)
 
         if st.button("✕", key="fl_chat_close"):
