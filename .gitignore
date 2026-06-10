@@ -6,3 +6,5 @@ __pycache__/
 scratch/
 ga4_token.json
 oauth_client.json
+ga4_credentials*.json
+~$*

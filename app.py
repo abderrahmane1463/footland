@@ -262,8 +262,24 @@ st.markdown("""
 
 
 # ─── Logging Helper ───────────────────────────────────────────────────────────
+LOG_MAX_ENTRIES = 200  # keep the log bounded so it doesn't grow forever
+
+
+def _trim_log(content: str, max_entries: int = LOG_MAX_ENTRIES) -> str:
+    """Keep only the most recent `max_entries` records, preserving the header."""
+    import re
+    header, sep, rest = content.partition("## Session Log")
+    if not sep:
+        return content
+    entries = re.split(r"(?=\n### \[)", rest)
+    preamble, records = entries[0], entries[1:]
+    if len(records) <= max_entries:
+        return content
+    return header + sep + preamble + "".join(records[-max_entries:])
+
+
 def log_refresh(platform: str, period: str, status: str, notes: str = ""):
-    """Appends a refresh entry to AI_CONTEXT_LOG.md."""
+    """Appends a refresh entry to AI_CONTEXT_LOG.md, trimming old entries to keep it bounded."""
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
     entry = (
         f"\n### [{timestamp} UTC] — Data Refresh\n"
@@ -277,6 +293,12 @@ def log_refresh(platform: str, period: str, status: str, notes: str = ""):
     try:
         with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
             f.write(entry)
+        with open(LOG_FILE_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+        trimmed = _trim_log(content)
+        if trimmed != content:
+            with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
+                f.write(trimmed)
     except Exception:
         pass
 
