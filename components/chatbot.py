@@ -229,18 +229,23 @@ def render_chatbot():
 <style>
 .st-key-fl_chatbot_container {{
     position: fixed !important;
-    bottom: 96px;
-    right: 16px;
-    width: 360px;
-    max-width: calc(100vw - 24px);
-    height: 520px;
-    z-index: 9999;
-    background: {_bg};
-    border: 1px solid {_border};
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45);
-    overflow: hidden;
+    bottom: 96px !important;
+    right: 16px !important;
+    top: auto !important;
+    left: auto !important;
+    width: 360px !important;
+    max-width: calc(100vw - 24px) !important;
+    height: 520px !important;
+    max-height: 520px !important;
+    min-height: 0 !important;
+    z-index: 9999 !important;
+    background: {_bg} !important;
+    border: 1px solid {_border} !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45) !important;
+    overflow: hidden !important;
     padding: 0 !important;
+    margin: 0 !important;
     display: flex !important;
     flex-direction: column !important;
     gap: 0 !important;
@@ -248,7 +253,7 @@ def render_chatbot():
 
 /* Header row (title + close button) — only the row containing .fl-chat-title */
 .st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:has(.fl-chat-title) {{
-    flex: 0 0 auto;
+    flex: 0 0 auto !important;
     background: linear-gradient(90deg, #E8420A, #C1320A);
     align-items: center;
     padding: 0.55rem 0.8rem;
@@ -276,13 +281,22 @@ def render_chatbot():
 
 /* Scrollable messages area — middle, takes remaining space */
 .st-key-fl_chatbot_container [data-testid="stElementContainer"]:has(.fl-chat-messages) {{
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}}
+.st-key-fl_chatbot_container [data-testid="stElementContainer"]:has(.fl-chat-messages) [data-testid="stMarkdownContainer"] {{
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
 }}
 .fl-chat-messages {{
-    height: 100%;
-    overflow-y: auto;
+    display: block !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
     padding: 0.7rem;
     scrollbar-width: thin;
     scrollbar-color: #E8420A transparent;
@@ -303,11 +317,12 @@ def render_chatbot():
 
 /* Input row (form) — pinned at the bottom of the panel */
 .st-key-fl_chatbot_container [data-testid="stForm"] {{
-    flex: 0 0 auto;
+    flex: 0 0 auto !important;
     border: none;
     border-top: 1px solid {_border};
     padding: 0.5rem 0.6rem;
     background: transparent;
+    margin: 0 !important;
 }}
 .st-key-fl_chatbot_container [data-testid="stForm"] [data-testid="stTextInput"] input {{
     background: {_input_bg} !important;
