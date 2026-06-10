@@ -241,17 +241,9 @@ def render_chatbot():
     box-shadow: 0 8px 32px rgba(0,0,0,0.45);
     overflow: hidden;
     padding: 0 !important;
-    display: flex;
-    flex-direction: column;
-}}
-.st-key-fl_chatbot_container > div,
-.st-key-fl_chatbot_container [data-testid="stVerticalBlock"] {{
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 0 !important;
-    height: 100%;
 }}
 
 /* Header row (title + close button) — only the row containing .fl-chat-title */
