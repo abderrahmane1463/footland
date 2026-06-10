@@ -254,14 +254,14 @@ def render_chatbot():
     height: 100%;
 }}
 
-/* Header row (title + close button) */
-.st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:first-of-type {{
+/* Header row (title + close button) — only the row containing .fl-chat-title */
+.st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:has(.fl-chat-title) {{
     flex: 0 0 auto;
     background: linear-gradient(90deg, #E8420A, #C1320A);
     align-items: center;
     padding: 0.55rem 0.8rem;
 }}
-.st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stMarkdownContainer"] p {{
+.st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:has(.fl-chat-title) [data-testid="stMarkdownContainer"] p {{
     color: #ffffff !important;
     font-weight: 700;
     font-size: 0.95rem;
@@ -315,6 +315,9 @@ def render_chatbot():
     height: 2.4rem !important;
     padding: 0 !important;
 }}
+.st-key-fl_chatbot_container [data-testid="InputInstructions"] {{
+    display: none !important;
+}}
 
 @media (max-width: 480px) {{
     .st-key-fl_chatbot_container {{
@@ -332,7 +335,7 @@ def render_chatbot():
     with st.container(key="fl_chatbot_container"):
         hcol1, hcol2 = st.columns([6, 1])
         with hcol1:
-            st.markdown("🤖 **Assistant IA Footland**")
+            st.markdown('<span class="fl-chat-title">🤖 <b>Assistant IA Footland</b></span>', unsafe_allow_html=True)
         with hcol2:
             if st.button("✕", key="fl_chat_close"):
                 st.session_state.chat_open = False
