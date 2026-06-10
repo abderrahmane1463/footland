@@ -219,8 +219,10 @@ def _build_msgs_html(history, dark: bool = True) -> str:
 def render_chatbot():
     """Render the floating AI assistant panel (only call when chat_open is True)."""
     _dark = st.session_state.get("theme", "dark") == "dark"
-    _bg     = "#161616" if _dark else "#ffffff"
-    _border = "#262626" if _dark else "#e5e7eb"
+    _bg       = "#161616" if _dark else "#ffffff"
+    _border   = "#262626" if _dark else "#e5e7eb"
+    _input_bg = "rgba(255,255,255,0.06)" if _dark else "#f3f4f6"
+    _text_c   = "#ffffff" if _dark else "#111827"
 
     st.markdown(
         f"""
@@ -231,6 +233,7 @@ def render_chatbot():
     right: 16px;
     width: 360px;
     max-width: calc(100vw - 24px);
+    height: 520px;
     z-index: 9999;
     background: {_bg};
     border: 1px solid {_border};
@@ -238,44 +241,31 @@ def render_chatbot():
     box-shadow: 0 8px 32px rgba(0,0,0,0.45);
     overflow: hidden;
     padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+}}
+.st-key-fl_chatbot_container > div,
+.st-key-fl_chatbot_container [data-testid="stVerticalBlock"] {{
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0 !important;
+    height: 100%;
 }}
 
-/* Pin the chat input to the bottom of the screen, aligned under the panel */
-div[data-testid="stBottom"] {{
-    position: fixed !important;
-    inset: auto 16px 16px auto !important;
-    width: 360px !important;
-    max-width: calc(100vw - 24px) !important;
-    z-index: 9999 !important;
-}}
-div[data-testid="stBottom"] > div {{
-    background: {_bg} !important;
-    border: 1px solid {_border} !important;
-    border-radius: 12px !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45) !important;
-    max-width: 100% !important;
-    padding: 0.4rem !important;
-}}
-.st-key-fl_chatbot_container [data-testid="stVerticalBlockBorderWrapper"] {{
-    border-radius: 16px;
-}}
-.st-key-fl_chatbot_container [data-testid="stVerticalBlock"] {{
-    gap: 0 !important;
-}}
-.fl-chat-header {{
-    position: relative;
+/* Header row (title + close button) */
+.st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:first-of-type {{
+    flex: 0 0 auto;
     background: linear-gradient(90deg, #E8420A, #C1320A);
+    align-items: center;
+    padding: 0.55rem 0.8rem;
+}}
+.st-key-fl_chatbot_container [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stMarkdownContainer"] p {{
     color: #ffffff !important;
     font-weight: 700;
     font-size: 0.95rem;
-    padding: 0.7rem 2.4rem 0.7rem 1rem;
-    margin: -1rem -1rem 0.5rem -1rem;
-}}
-.st-key-fl_chat_close {{
-    position: absolute;
-    top: 0.35rem;
-    right: 0.6rem;
-    z-index: 10000;
+    margin: 0;
 }}
 .st-key-fl_chat_close button {{
     background: transparent !important;
@@ -283,12 +273,47 @@ div[data-testid="stBottom"] > div {{
     color: #ffffff !important;
     font-size: 1.1rem !important;
     line-height: 1 !important;
-    padding: 0.2rem 0.45rem !important;
+    padding: 0.2rem 0.5rem !important;
     min-height: unset !important;
     box-shadow: none !important;
+    float: right;
 }}
 .st-key-fl_chat_close button:hover {{
-    background: rgba(255,255,255,0.15) !important;
+    background: rgba(255,255,255,0.18) !important;
+}}
+
+/* Scrollable messages area — middle, takes remaining space */
+.st-key-fl_chatbot_container [data-testid="stElementContainer"]:has(.fl-chat-messages) {{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}}
+.fl-chat-messages {{
+    height: 100%;
+    overflow-y: auto;
+    padding: 0.7rem;
+}}
+
+/* Input row (form) — pinned at the bottom of the panel */
+.st-key-fl_chatbot_container [data-testid="stForm"] {{
+    flex: 0 0 auto;
+    border: none;
+    border-top: 1px solid {_border};
+    padding: 0.5rem 0.6rem;
+    background: transparent;
+}}
+.st-key-fl_chatbot_container [data-testid="stForm"] [data-testid="stTextInput"] input {{
+    background: {_input_bg} !important;
+    color: {_text_c} !important;
+    border-radius: 20px !important;
+    border: 1px solid {_border} !important;
+}}
+.st-key-fl_chatbot_container [data-testid="stForm"] [data-testid="baseButton-secondaryFormSubmit"],
+.st-key-fl_chatbot_container [data-testid="stForm"] button[kind="secondaryFormSubmit"] {{
+    border-radius: 50% !important;
+    width: 2.4rem !important;
+    height: 2.4rem !important;
+    padding: 0 !important;
 }}
 
 @media (max-width: 480px) {{
@@ -296,11 +321,7 @@ div[data-testid="stBottom"] > div {{
         width: calc(100vw - 16px);
         right: 8px;
         bottom: 84px;
-    }}
-    div[data-testid="stBottom"] {{
-        width: calc(100vw - 16px) !important;
-        right: 8px !important;
-        bottom: 8px !important;
+        height: 70vh;
     }}
 }}
 </style>
@@ -308,20 +329,42 @@ div[data-testid="stBottom"] > div {{
         unsafe_allow_html=True,
     )
 
-    with st.container(height=440, key="fl_chatbot_container"):
-        st.markdown('<div class="fl-chat-header">🤖 Assistant IA Footland</div>', unsafe_allow_html=True)
-
-        if st.button("✕", key="fl_chat_close"):
-            st.session_state.chat_open = False
-            st.rerun()
+    with st.container(key="fl_chatbot_container"):
+        hcol1, hcol2 = st.columns([6, 1])
+        with hcol1:
+            st.markdown("🤖 **Assistant IA Footland**")
+        with hcol2:
+            if st.button("✕", key="fl_chat_close"):
+                st.session_state.chat_open = False
+                st.rerun()
 
         msgs_html = _build_msgs_html(st.session_state.get("chat_history", []), _dark)
-        st.markdown(f'<div style="padding:0 0.2rem;">{msgs_html}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="fl-chat-messages" id="fl-chat-messages">{msgs_html}</div>', unsafe_allow_html=True)
 
-        prompt = st.chat_input("Posez votre question...", key="fl_chat_input")
+        with st.form("fl_chat_form", clear_on_submit=True, border=False):
+            fcol1, fcol2 = st.columns([6, 1])
+            with fcol1:
+                user_msg = st.text_input(
+                    "message", placeholder="Posez votre question...",
+                    label_visibility="collapsed", key="fl_chat_text",
+                )
+            with fcol2:
+                sent = st.form_submit_button("➤")
 
-    if prompt:
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
+    # Auto-scroll the messages area to the bottom after each render
+    st.components.v1.html(
+        """
+        <script>
+        const doc = window.parent.document;
+        const el = doc.getElementById("fl-chat-messages");
+        if (el) { el.scrollTop = el.scrollHeight; }
+        </script>
+        """,
+        height=0,
+    )
+
+    if sent and user_msg and user_msg.strip():
+        st.session_state.chat_history.append({"role": "user", "content": user_msg.strip()})
         with st.spinner("L'assistant réfléchit..."):
             reply = _get_groq_response(st.session_state.chat_history)
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
