@@ -120,6 +120,8 @@ def render_documentation():
     col4, col5 = st.columns(2)
     with col4:
         st.info("📊 **Google Analytics** — Vue d'ensemble + Sources de trafic, E-commerce (Parcours d'achat + Top articles), Événements, Audience (Géographie + Appareils)")
+    with col5:
+        st.info("🤖 **Assistant IA** — Chatbot flottant (Groq / LLaMA 3.3) répondant aux questions sur les données affichées dans le dashboard")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -440,6 +442,31 @@ Trié par date de création de campagne (plus récente en premier), groupé par 
   <tr><td class="kpi-name">Taux d'engagement</td><td class="kpi-desc">Sessions engagées ÷ Sessions × 100 pour cet appareil.</td><td><span class="endpoint">engagementRate</span></td></tr>
   <tr><td class="kpi-name">Taux de rebond</td><td class="kpi-desc">Taux de rebond pour cet appareil.</td><td><span class="endpoint">bounceRate</span></td></tr>
   <tr><td class="kpi-name">% du total</td><td class="kpi-desc">Part de cet appareil sur le total des utilisateurs.</td><td><span class="endpoint">Calculé</span></td></tr>
+</table>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Assistant IA ──────────────────────────────────────────────────────────
+    st.markdown('<div class="doc-section-title">🤖 Assistant IA</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+<p style="color:#a1a1aa;font-size:14px;">Un assistant conversationnel flottant, propulsé par <strong>Groq</strong> (modèles LLaMA 3.3 70B / 3.1 8B), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
+<table class="kpi-table">
+  <tr><th>Fonctionnalité</th><th>Description</th><th>Détail technique</th></tr>
+  <tr><td class="kpi-name">💬 Ouverture / fermeture</td><td class="kpi-desc">Bouton "💬 Assistant IA" en bas de la barre latérale. Le bouton devient "✕ Fermer l'assistant" quand le panneau est ouvert.</td><td><span class="endpoint">st.session_state.chat_open</span></td></tr>
+  <tr><td class="kpi-name">🧠 Modèle IA</td><td class="kpi-desc">LLaMA 3.3 70B Versatile en priorité ; bascule automatiquement sur LLaMA 3.1 8B Instant si la limite quotidienne du premier modèle est atteinte.</td><td><span class="endpoint">Groq API — chat.completions</span></td></tr>
+  <tr><td class="kpi-name">📊 Contexte des données</td><td class="kpi-desc">L'assistant connaît les KPIs de la période et de l'onglet actuellement affichés (Facebook, Instagram, Boost, Google Analytics) — uniquement les sections déjà visitées dans la session en cours.</td><td><span class="endpoint">ctx_facebook / ctx_instagram / ctx_boost / ctx_ga4</span></td></tr>
+  <tr><td class="kpi-name">🌐 Langue</td><td class="kpi-desc">Répond en français, en s'appuyant sur les données réelles du dashboard ; indique clairement si une donnée n'est pas disponible plutôt que d'inventer un chiffre.</td><td><span class="endpoint">—</span></td></tr>
+  <tr><td class="kpi-name">🗑️ Effacer la conversation</td><td class="kpi-desc">Bouton visible quand le panneau est ouvert et qu'il y a des messages — réinitialise l'historique de discussion.</td><td><span class="endpoint">st.session_state.chat_history</span></td></tr>
+</table>
+<br>
+<p style="color:#a1a1aa;font-size:13px;font-weight:600;">⚠️ Limitations de l'assistant</p><br>
+<table class="kpi-table">
+  <tr><th>Situation</th><th>Comportement</th></tr>
+  <tr><td class="kpi-name">Aucune donnée chargée</td><td class="kpi-desc">Si aucun onglet n'a encore été visité dans la session, l'assistant répond sans contexte chiffré et le signale.</td></tr>
+  <tr><td class="kpi-name">Limite quotidienne atteinte</td><td class="kpi-desc">Si les deux modèles Groq ont atteint leur quota gratuit, un message d'erreur invite à réessayer plus tard.</td></tr>
+  <tr><td class="kpi-name">Clé API manquante</td><td class="kpi-desc">Si <code style="background:rgba(232,66,10,0.1);padding:1px 5px;border-radius:4px;">GROQ_API_KEY</code> n'est pas configurée (st.secrets ou .env), l'assistant affiche un message d'erreur explicite.</td></tr>
+  <tr><td class="kpi-name">Hors-sujet</td><td class="kpi-desc">L'assistant est conçu pour répondre uniquement sur le contenu du dashboard Footland (KPIs, sources de données, méthodes de calcul).</td></tr>
 </table>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
