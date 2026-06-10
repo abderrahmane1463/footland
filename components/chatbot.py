@@ -292,6 +292,21 @@ def render_chatbot():
     height: 100%;
     overflow-y: auto;
     padding: 0.7rem;
+    scrollbar-width: thin;
+    scrollbar-color: #E8420A transparent;
+}}
+.fl-chat-messages::-webkit-scrollbar {{
+    width: 6px;
+}}
+.fl-chat-messages::-webkit-scrollbar-track {{
+    background: transparent;
+}}
+.fl-chat-messages::-webkit-scrollbar-thumb {{
+    background-color: #E8420A;
+    border-radius: 3px;
+}}
+.fl-chat-messages::-webkit-scrollbar-thumb:hover {{
+    background-color: #FF6B35;
 }}
 
 /* Input row (form) — pinned at the bottom of the panel */
