@@ -33,6 +33,11 @@ def render_sidebar(log_refresh_fn):
     Renders the sidebar and returns (platform, days, start_date, end_date).
     log_refresh_fn is called when the user clicks Refresh.
     """
+    if "chat_open" not in st.session_state:
+        st.session_state.chat_open = False
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
     with st.sidebar:
         _logo_path = pathlib.Path("assets/footland_logo.png")
         if _logo_path.exists():
@@ -155,6 +160,20 @@ def render_sidebar(log_refresh_fn):
                 st.error(f"❌ Erreur\n\n{health.get('message', 'Unknown error')}")
 
             st.caption("Cache permanent • Supabase")
+
+        st.divider()
+
+        if st.button(
+            "✕ Fermer l'assistant" if st.session_state.chat_open else "💬 Assistant IA",
+            width="stretch",
+        ):
+            st.session_state.chat_open = not st.session_state.chat_open
+            st.rerun()
+
+        if st.session_state.chat_open and st.session_state.chat_history:
+            if st.button("🗑️ Effacer la conversation", width="stretch"):
+                st.session_state.chat_history = []
+                st.rerun()
 
         st.divider()
 

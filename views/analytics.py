@@ -529,6 +529,16 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
         _no_data("Données Google Analytics non disponibles. Vérifiez que le token GA4 est configuré.")
         return
 
+    # ── Context for AI chatbot ────────────────────────────────────────────────
+    _ov = ga4_data.get("overview", {})
+    st.session_state["ctx_ga4"] = {
+        "period": f"{since} → {until}",
+        "active_users": _ov.get("active_users", 0),
+        "new_users": _ov.get("new_users", 0),
+        "sessions": _ov.get("sessions", 0),
+        "engaged_sessions": _ov.get("engaged_sessions", 0),
+    }
+
     t1, t2, t3, t4 = st.tabs([
         "📊 Vue d'ensemble",
         "🛒 E-commerce",

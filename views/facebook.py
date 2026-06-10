@@ -266,6 +266,23 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
     _reach_note      = "ℹ️ Indisponible pour cette période" if _reach_unavailable else None
     _eng_rate_display = "—" if _reach_unavailable else f"{eng_rate}%"
 
+    # ── Context for AI chatbot ────────────────────────────────────────────────
+    st.session_state["ctx_facebook"] = {
+        "period": period_label,
+        "followers": total_fans,
+        "new_followers": total_adds,
+        "unfollows": total_removes,
+        "engagement_rate": _eng_rate_display,
+        "reach": _reach_display,
+        "impressions": total_impressions,
+        "content_interactions": total_content_interactions,
+        "posts_count": len(posts),
+        "total_interactions": total_engagements,
+        "reactions": total_reacs,
+        "comments": total_comms,
+        "shares": total_shars,
+    }
+
     # ── Delta helpers ─────────────────────────────────────────────────────────
     def _d(curr, prev):
         try:

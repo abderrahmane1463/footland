@@ -174,6 +174,21 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     )
     _ig_eng_rate_display = "—" if _ig_reach_unavailable else f"{ig_eng_rate}%"
 
+    # ── Context for AI chatbot ────────────────────────────────────────────────
+    st.session_state["ctx_instagram"] = {
+        "period": period_label,
+        "followers": followers,
+        "posts_count": len(ig_posts),
+        "engagement_rate": _ig_eng_rate_display,
+        "reach": _ig_reach_display,
+        "views": total_ig_views,
+        "saves": total_ig_saves,
+        "total_interactions": total_ig_interactions,
+        "likes": total_ig_likes,
+        "comments": total_ig_comments,
+        "shares": total_ig_shares,
+    }
+
     # ── Delta helpers ─────────────────────────────────────────────────────────
     def _d(curr, prev):
         try:

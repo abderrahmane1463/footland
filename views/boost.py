@@ -1080,6 +1080,19 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
         if c.get("objective") in _CONV_OBJ and (c.get("spend", 0) > 0 or c.get("impressions", 0) > 0)
     )
 
+    # ── Context for AI chatbot ────────────────────────────────────────────────
+    st.session_state["ctx_boost"] = {
+        "period": f"{_period_since} → {_period_until}",
+        "campaigns_count": totals.get("campaigns_count", 0),
+        "link_clicks": totals.get("link_clicks", 0),
+        "reach": totals.get("reach", 0),
+        "impressions": totals.get("impressions", 0),
+        "cpc": totals.get("cpc", 0.0),
+        "ctr": totals.get("ctr", 0.0),
+        "spend": totals.get("spend", 0.0),
+        "frequency": totals.get("frequency", 0.0),
+    }
+
     # Header
     _dark   = st.session_state.get("theme", "dark") == "dark"
     _hdr_c  = "#ffffff"                 if _dark else "#111827"
