@@ -227,10 +227,10 @@ def render_chatbot():
 <style>
 .st-key-fl_chatbot_container {{
     position: fixed !important;
-    bottom: 90px;
-    right: 24px;
-    width: 380px;
-    max-width: 92vw;
+    bottom: 84px;
+    right: 16px;
+    width: 360px;
+    max-width: calc(100vw - 24px);
     z-index: 9999;
     background: {_bg};
     border: 1px solid {_border};
@@ -242,21 +242,56 @@ def render_chatbot():
 .st-key-fl_chatbot_container [data-testid="stVerticalBlockBorderWrapper"] {{
     border-radius: 16px;
 }}
+.st-key-fl_chatbot_container [data-testid="stVerticalBlock"] {{
+    gap: 0 !important;
+}}
 .fl-chat-header {{
+    position: relative;
     background: linear-gradient(90deg, #E8420A, #C1320A);
     color: #ffffff !important;
     font-weight: 700;
     font-size: 0.95rem;
-    padding: 0.8rem 1rem;
+    padding: 0.7rem 2.4rem 0.7rem 1rem;
     margin: -1rem -1rem 0.5rem -1rem;
+}}
+.st-key-fl_chat_close {{
+    position: absolute;
+    top: 0.35rem;
+    right: 0.6rem;
+    z-index: 10000;
+}}
+.st-key-fl_chat_close button {{
+    background: transparent !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-size: 1.1rem !important;
+    line-height: 1 !important;
+    padding: 0.2rem 0.45rem !important;
+    min-height: unset !important;
+    box-shadow: none !important;
+}}
+.st-key-fl_chat_close button:hover {{
+    background: rgba(255,255,255,0.15) !important;
+}}
+
+@media (max-width: 480px) {{
+    .st-key-fl_chatbot_container {{
+        width: calc(100vw - 16px);
+        right: 8px;
+        bottom: 72px;
+    }}
 }}
 </style>
 """,
         unsafe_allow_html=True,
     )
 
-    with st.container(height=520, key="fl_chatbot_container"):
+    with st.container(height=480, key="fl_chatbot_container"):
         st.markdown('<div class="fl-chat-header">🤖 Assistant IA Footland</div>', unsafe_allow_html=True)
+
+        if st.button("✕", key="fl_chat_close"):
+            st.session_state.chat_open = False
+            st.rerun()
 
         msgs_html = _build_msgs_html(st.session_state.get("chat_history", []), _dark)
         st.markdown(f'<div style="padding:0 0.2rem;">{msgs_html}</div>', unsafe_allow_html=True)
