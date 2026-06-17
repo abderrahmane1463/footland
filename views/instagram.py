@@ -4,7 +4,7 @@ import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import db
-from components.charts import get_chart_layout, series_to_df, safe_sum, render_top3_podium
+from components.charts import get_chart_layout, series_to_df, safe_sum
 from components.skeleton import skeleton_dashboard_html, skeleton_charts_html
 
 
@@ -277,8 +277,8 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     )
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
-    tab1, tab2, tab3 = st.tabs([
-        "📡Visibility", "💬Engagement", "🏆Top Content"
+    tab1, tab2 = st.tabs([
+        "📡Visibility", "💬Engagement"
     ])
 
     # ── TAB 1: Engagement ─────────────────────────────────────────────────────
@@ -569,46 +569,4 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
 
         if reach_df.empty:
             st.info("No visibility data available for this period.")
-
-    # ── TAB 3: Top Content ─────────────────────────────────────────────────────
-    with tab3:
-        if ig_posts:
-            # Instagram metric grid. FB's post-level "Clics" has no IG equivalent
-            # (website_clicks is dead on all organic post types — verified live), so
-            # the cards instead show Vues (views, IG's universal view count) and
-            # Enregistrements (saves) — both IG strengths. Everything else mirrors FB.
-            # NOTE: the "impressions" field on IG posts holds the v22+ `views` value.
-            _ig_podium_metrics = [
-                ("👁️", "Couverture", "reach"),
-                ("👀", "Vues",       "impressions"),
-                ("❤️", "",           "reactions"),
-                ("💬", "",           "comments"),
-                ("🔖", "",           "saves"),
-                ("↗️", "",           "shares"),
-                ("⚡", "Total",       "total_interactions"),
-            ]
-            render_top3_podium(
-                ig_posts,
-                sort_key="reach",
-                title="TOP #3 PUBLICATIONS PAR VISIBILITÉ",
-                metrics=_ig_podium_metrics,
-            )
-            st.divider()
-            render_top3_podium(
-                ig_posts,
-                sort_key="total_interactions",
-                title="TOP #3 PUBLICATIONS PAR ENGAGEMENT",
-                metrics=_ig_podium_metrics,
-            )
-
-            with st.expander("📋 Toutes les publications"):
-                posts_df = pd.DataFrame(ig_posts)
-                _ig_cols = ["created_time", "text", "reach", "impressions",
-                            "reactions", "comments", "saves", "shares", "total_interactions"]
-                st.dataframe(
-                    posts_df[[c for c in _ig_cols if c in posts_df.columns]],
-                    use_container_width=True,
-                )
-        else:
-            st.info("No post data available.")
 
