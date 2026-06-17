@@ -812,9 +812,10 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
 
     if ads:
         # ── Objective filter ──────────────────────────────────────────────────
+        _sel_objs: list[str] = []
         all_objectives = sorted(set(a.get("objective", "—") for a in ads if a.get("objective", "—") != "—"))
         if all_objectives:
-            selected_objectives = st.multiselect(
+            _sel_objs = st.multiselect(
                 "Filtrer par objectif",
                 options=all_objectives,
                 default=all_objectives,
@@ -822,7 +823,7 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
                 placeholder="Sélectionner un ou plusieurs objectifs…",
                 key="obj_filter_table",
             )
-            ads = [a for a in ads if a.get("objective", "—") in selected_objectives] if selected_objectives else ads
+            ads = [a for a in ads if a.get("objective", "—") in _sel_objs] if _sel_objs else ads
 
         ad_rows = [
             _build_ad_row(a)
@@ -855,6 +856,10 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
             selection_mode="multi-row",
             column_config=_csv_col_config(),
         )
+
+        # ── Campaign-level KPI table — same filter, right below ───────────────
+        st.divider()
+        _render_campaign_kpi_table(campaigns, adset_ad_data, selected_objectives=_sel_objs or None)
     else:
         _no_data_banner("Aucune donnée ads disponible — les données adset/ads se chargent séparément.")
 
@@ -943,14 +948,13 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
             else:
                 st.caption("Aucune donnée adset disponible pour cette campagne.")
 
-    # ── Campaign-level KPI table (CSV-style, one row per campaign) ────────────
-    st.divider()
-    _render_campaign_kpi_table(campaigns, adset_ad_data)
 
-
-def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None = None):
+def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None = None,
+                               selected_objectives: list[str] | None = None):
     """Campaign-level KPI table mirroring the Meta Ads Manager CSV export columns."""
     active = [c for c in campaigns if c.get("spend", 0) > 0 or c.get("impressions", 0) > 0]
+    if selected_objectives:
+        active = [c for c in active if c.get("objective", "—") in selected_objectives]
     if not active:
         return
 
@@ -1048,6 +1052,8 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
         _df,
         use_container_width=True,
         hide_index=True,
+        on_select="rerun",
+        selection_mode="multi-row",
         column_config={
             "Campaign name":                    st.column_config.TextColumn("Campaign name",                        width="large"),
             "Objective":                        st.column_config.TextColumn("Objective",                            width="medium"),
