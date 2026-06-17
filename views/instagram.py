@@ -573,9 +573,14 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     # ── TAB 3: Top Content ─────────────────────────────────────────────────────
     with tab3:
         if ig_posts:
-            # Instagram-specific metric grid (saves replaces FB's clicks)
+            # Instagram metric grid. FB's post-level "Clics" has no IG equivalent
+            # (website_clicks is dead on all organic post types — verified live), so
+            # the cards instead show Vues (views, IG's universal view count) and
+            # Enregistrements (saves) — both IG strengths. Everything else mirrors FB.
+            # NOTE: the "impressions" field on IG posts holds the v22+ `views` value.
             _ig_podium_metrics = [
                 ("👁️", "Couverture", "reach"),
+                ("👀", "Vues",       "impressions"),
                 ("❤️", "",           "reactions"),
                 ("💬", "",           "comments"),
                 ("🔖", "",           "saves"),
