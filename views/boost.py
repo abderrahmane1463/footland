@@ -153,6 +153,71 @@ def _no_data_banner(msg: str = "Aucune donnée publicitaire disponible pour cett
     )
 
 
+def _metric_picker(all_cols: list[str], fixed_cols: list[str], key: str) -> list[str]:
+    """
+    Expander with grouped metric checkboxes. Returns fixed_cols + user-selected columns
+    in the original DataFrame column order.
+    """
+    optional = [c for c in all_cols if c not in fixed_cols]
+
+    _GROUPS: dict[str, list[str]] = {
+        "📊 Audience":     ["Reach", "Impressions", "Frequency"],
+        "🖱️ Clics":        ["Link clicks", "Clicks (all)", "Outbound clicks",
+                            "CTR (all)", "CTR (link click-through rate)",
+                            "Website landing page views"],
+        "💰 Coûts":        ["Amount spent (EUR)", "CPC (cost per link click)", "CPC (all)",
+                            "CPM (cost per 1,000 impressions)",
+                            "Cost per 1,000 Meta Accounts reached",
+                            "Cost per result", "Cost per landing page view",
+                            "Cost per add to cart", "Cost per checkout initiated",
+                            "Cost per purchase", "Cost per outbound click"],
+        "🎯 Conversions":  ["Result type", "Results", "Purchases", "Website purchases",
+                            "Adds to cart", "Website adds to cart",
+                            "Checkouts initiated", "Website checkouts initiated"],
+        "⭐ Qualité":      ["Quality ranking", "Engagement rate ranking",
+                            "Conversion rate ranking"],
+        "ℹ️ Campagne":     ["Objective", "Delivery status", "Delivery level",
+                            "Campaign Budget", "Campaign Budget Type",
+                            "Ad Set Budget", "Ad Set Budget Type",
+                            "Starts", "Ends", "Start", "End",
+                            "Reporting starts", "Reporting ends"],
+    }
+
+    _dark  = st.session_state.get("theme", "dark") == "dark"
+    _hdr_c = "rgba(255,255,255,0.55)" if _dark else "#6b7280"
+
+    with st.expander("📊 Personnaliser les colonnes", expanded=False):
+        st.caption(
+            f"Colonnes fixes (toujours affichées) : **{', '.join(fixed_cols)}**"
+        )
+        selected: list[str] = []
+        g_cols = st.columns(3)
+        g_idx  = 0
+        for group_name, group_metrics in _GROUPS.items():
+            in_group = [c for c in group_metrics if c in optional]
+            if not in_group:
+                continue
+            with g_cols[g_idx % 3]:
+                st.markdown(
+                    f'<div style="font-size:0.78rem;font-weight:700;'
+                    f'color:{_hdr_c};margin-bottom:4px;">{group_name}</div>',
+                    unsafe_allow_html=True,
+                )
+                picked = st.multiselect(
+                    group_name,
+                    options=in_group,
+                    default=in_group,
+                    label_visibility="collapsed",
+                    key=f"{key}_{group_name}",
+                )
+                selected.extend(picked)
+            g_idx += 1
+
+    # Preserve original column order
+    selected_set = set(selected)
+    return [c for c in all_cols if c in fixed_cols or c in selected_set]
+
+
 def _section_header(title: str, big: bool = True):
     _brd = "rgba(255,255,255,0.15)"
     st.markdown(
@@ -805,14 +870,18 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
 
         _ads_df = pd.DataFrame(ad_rows)
 
-        # ── Excel export — placed top-right, above the table (where Streamlit's
-        #    built-in CSV toolbar sits) ──────────────────────────────────────────
+        # ── Column picker ─────────────────────────────────────────────────────
+        _FIXED_AD = ["Campaign name", "Ad set name", "Ad name"]
+        _visible_ads = _metric_picker(list(_ads_df.columns), _FIXED_AD, "picker_ads")
+        _ads_display = _ads_df[[c for c in _ads_df.columns if c in _visible_ads]]
+
+        # ── Excel export ──────────────────────────────────────────────────────
         _spacer, _dl_col = st.columns([3, 1])
         with _dl_col:
             try:
                 st.download_button(
                     "📥 Télécharger en Excel",
-                    data=_df_to_excel_bytes(_ads_df, sheet_name="Campagnes"),
+                    data=_df_to_excel_bytes(_ads_display, sheet_name="Campagnes"),
                     file_name="campagnes_footland.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="dl_campaigns_xlsx",
@@ -822,7 +891,7 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
                 st.caption(f"Export Excel indisponible : {e}")
 
         st.dataframe(
-            _ads_df,
+            _ads_display,
             use_container_width=True,
             hide_index=True,
             on_select="rerun",
@@ -1022,12 +1091,17 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
     _df = pd.DataFrame(rows)
     _section_header("📊 Rapport Hebdomadaire Notoriété & Engagement")
 
+    # ── Column picker ─────────────────────────────────────────────────────────
+    _FIXED_CAMP = ["Campaign name"]
+    _visible_camp = _metric_picker(list(_df.columns), _FIXED_CAMP, "picker_camp")
+    _df_display = _df[[c for c in _df.columns if c in _visible_camp]]
+
     _spacer, _dl_col = st.columns([3, 1])
     with _dl_col:
         try:
             st.download_button(
                 "📥 Télécharger en Excel",
-                data=_df_to_excel_bytes(_df, sheet_name="Rapport Campagnes"),
+                data=_df_to_excel_bytes(_df_display, sheet_name="Rapport Campagnes"),
                 file_name="rapport_campagnes_footland.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="dl_camp_report_xlsx",
@@ -1037,7 +1111,7 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
             st.caption(f"Export Excel indisponible : {e}")
 
     st.dataframe(
-        _df,
+        _df_display,
         use_container_width=True,
         hide_index=True,
         on_select="rerun",
