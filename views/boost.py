@@ -586,7 +586,7 @@ def _render_insights_panel(totals: dict, conv: dict):
 
 def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = None):
     """All campaigns as expandable rows — each expands to show adsets, each adset expands to show ads."""
-    _section_header("📋 TOUTES LES CAMPAGNES")
+    _section_header("📋 Rapport Hebdomadaire Sales")
 
     if not campaigns:
         _no_data_banner("Aucune campagne à afficher pour cette période.")
@@ -1020,7 +1020,7 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
         return
 
     _df = pd.DataFrame(rows)
-    _section_header("📊 RAPPORT PAR CAMPAGNE")
+    _section_header("📊 Rapport Hebdomadaire Notoriété & Engagement")
 
     _spacer, _dl_col = st.columns([3, 1])
     with _dl_col:
