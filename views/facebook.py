@@ -262,8 +262,13 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
     )
 
     # KPI display
+    # NOTE: since Meta's 2026-06-15 change, reach = unique media views (paid+organic
+    # combined — no organic-only split exists anymore). Labelled clearly below.
     _reach_display   = "—"  if _reach_unavailable else f"{total_reach:,}"
-    _reach_note      = "ℹ️ Indisponible pour cette période" if _reach_unavailable else None
+    _reach_note      = (
+        "ℹ️ Indisponible pour cette période" if _reach_unavailable
+        else "Vues uniques médias (organique + payant)"
+    )
     _eng_rate_display = "—" if _reach_unavailable else f"{eng_rate}%"
 
     # ── Context for AI chatbot ────────────────────────────────────────────────
@@ -342,7 +347,7 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
 </div>
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin-bottom:0.6rem;">
   {_kpi("👁️", "Spectateurs",             _reach_display, note=_reach_note)}
-  {_kpi("📢", "Impressions",              f"{total_impressions:,}",          delta=_d(total_impressions,        _prev_impr))}
+  {_kpi("📢", "Impressions",              f"{total_impressions:,}",          delta=_d(total_impressions,        _prev_impr), note="Vues médias totales")}
   {_kpi("🤝", "Content Interactions",     f"{total_content_interactions:,}", "#a78bfa")}
   {_kpi("📝", "Publications",             str(len(posts)),                   delta=_d(len(posts), _prev_posts))}
 </div>

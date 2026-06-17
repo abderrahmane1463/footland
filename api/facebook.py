@@ -202,12 +202,13 @@ def fetch_fb_visibility(days: int, start: str = None, end: str = None) -> dict:
     }
 
     # 1. Fetch daily metrics (for charts)
-    # page_impressions_unique + page_views_total — both confirmed working.
-    # page_impressions_unique is used for the daily Reach chart only;
-    # the KPI (period_reach) uses a separate period=month call below.
+    # NOTE (2026-06-15 deprecation): page_impressions_unique was removed by Meta.
+    # Replacement = page_total_media_view_unique (unique media views, paid+organic
+    # combined — Meta no longer exposes an organic-only split). Confirmed live for
+    # period day/week/month on this page. page_views_total still works.
     mapping = {
-        "page_impressions_unique": "reach",
-        "page_views_total":        "page_views",
+        "page_total_media_view_unique": "reach",
+        "page_views_total":             "page_views",
     }
     metrics_str = ",".join(mapping.keys())
 
@@ -227,26 +228,28 @@ def fetch_fb_visibility(days: int, start: str = None, end: str = None) -> dict:
     except Exception as e:
         print(f"DEBUG: visibility daily insights error: {e}")
 
-    # 1c. page_posts_impressions daily series.
-    # Diagnostic confirmed: page_impressions is blocked for this page type (#100 error).
-    # page_posts_impressions returns 35,030,491 which matches the report exactly.
+    # 1c. Impressions daily series.
+    # NOTE (2026-06-15 deprecation): page_posts_impressions was removed by Meta
+    # with NO unique-style replacement. Closest surviving metric is page_media_view
+    # (total, non-unique media views — paid+organic). Confirmed live for this page.
+    # This now powers the 📢 "Impressions" KPI (semantically: total media views).
     try:
         pv_data = _get_insights_chunked(
             f"{FACEBOOK_PAGE_ID}/insights",
-            {"metric": "page_posts_impressions", "period": "day"},
+            {"metric": "page_media_view", "period": "day"},
             since, until,
         )
         for m in pv_data.get("data", []):
-            if m["name"] == "page_posts_impressions":
+            if m["name"] == "page_media_view":
                 series = [
                     {"date": v["end_time"][:10], "value": v["value"]}
                     for v in m.get("values", [])
                 ]
                 result["page_impressions_daily"] = series
                 result["impressions"] = series
-        print(f"DEBUG: impressions daily rows={len(result['impressions'])}")
+        print(f"DEBUG: impressions (page_media_view) daily rows={len(result['impressions'])}")
     except Exception as e:
-        print(f"DEBUG: page_posts_impressions daily error: {e}")
+        print(f"DEBUG: page_media_view daily error: {e}")
 
     # 1c-b. Organic + Paid breakdown — optional.
     # page_impressions_organic / page_impressions_paid are deprecated for New Page Experience.
@@ -276,12 +279,11 @@ def fetch_fb_visibility(days: int, start: str = None, end: str = None) -> dict:
             print(f"DEBUG: organic/paid impressions breakdown ({org_m}) error: {e}")
 
     # 1d. Previous-period totals for growth indicators (period-over-period %)
-    # page_impressions / page_impressions_organic / page_impressions_paid are all
-    # deprecated for New Page Experience. Use page_posts_impressions (confirmed valid).
+    # Uses page_media_view (page_posts_impressions deprecated 2026-06-15).
     try:
         prev_since, prev_until = _prev_date_range(days)
         prev_data = _get(f"{FACEBOOK_PAGE_ID}/insights", {
-            "metric": "page_posts_impressions",
+            "metric": "page_media_view",
             "period": "day",
             "since": prev_since,
             "until": prev_until,
@@ -289,7 +291,7 @@ def fetch_fb_visibility(days: int, start: str = None, end: str = None) -> dict:
         for m in prev_data.get("data", []):
             vals = m.get("values", [])
             total_val = sum(v["value"] for v in vals if isinstance(v.get("value"), (int, float)))
-            if m["name"] == "page_posts_impressions":
+            if m["name"] == "page_media_view":
                 result["prev_total_views"] = total_val
     except Exception as e:
         print(f"DEBUG: prev period impressions error: {e}")
@@ -330,13 +332,13 @@ def fetch_fb_visibility(days: int, start: str = None, end: str = None) -> dict:
         def _try_reach(period: str) -> int:
             try:
                 d = _get(f"{FACEBOOK_PAGE_ID}/insights", {
-                    "metric": "page_impressions_unique",
+                    "metric": "page_total_media_view_unique",   # was page_impressions_unique (dep. 2026-06-15)
                     "period": period,
                     "since": since,
                     "until": until,
                 })
                 for m in d.get("data", []):
-                    if m["name"] == "page_impressions_unique":
+                    if m["name"] == "page_total_media_view_unique":
                         vals = m.get("values", [])
                         if vals:
                             v = vals[-1].get("value", 0)
@@ -534,12 +536,15 @@ def fetch_fb_posts(days: int = None, start: str = None, end: str = None, limit: 
         # Rule: request ONLY metrics confirmed to work, one batch per call.
         # If Meta ever re-enables the aggregate metrics, they appear in the
         # response automatically (metrics dict is keyed by name).
-        _REACH_METRICS = (                        # all return integers
-            "post_impressions_unique,"            # total reach (canonical)
-            "post_impressions_organic_unique,"    # organic reach
-            "post_impressions_paid_unique,"       # paid reach
-            "post_impressions_viral_unique,"      # viral reach (via shares)
-            "post_impressions_nonviral_unique,"   # non-viral reach
+        # NOTE (2026-06-15 deprecation): the entire post_impressions_*_unique family
+        # was removed by Meta. Replacement for total reach = post_total_media_view_unique
+        # (paid+organic unique media views; no organic/paid/viral breakdown exists anymore).
+        #
+        # CRITICAL — VERIFIED LIVE: post_total_media_view_unique returns its real value
+        # ONLY when requested ALONE. Batched with ANY other metric it silently returns 0
+        # (isolated=529,046 vs batched=0 on the same post). So it gets its own call below.
+        _MEDIA_VIEW_METRIC = "post_total_media_view_unique"   # MUST be fetched alone
+        _OTHER_METRICS = (                        # safe to batch together
             "post_clicks,"                        # total link clicks
             "post_video_views,"                   # video views ≥3 s
             "post_video_views_unique"             # unique video viewers
@@ -559,12 +564,23 @@ def fetch_fb_posts(days: int = None, start: str = None, end: str = None, limit: 
                     raw = item.get("values", [{}])[0].get("value", 0) if item.get("values") else 0
                     metrics[item["name"]] = raw
 
-            # ── 1. Reach metrics (confirmed-valid batch) ──────────────────────
+            # ── 1a. Reach — own call + period=lifetime ─────────────────────────
+            # post_total_media_view_unique returns BOTH a "lifetime" entry (the real
+            # total) AND a "day" series (zeros) under the same name. Without
+            # period=lifetime, _parse_items' last-wins loop keeps the daily 0.
             try:
-                ins = _get(f"{p['id']}/insights", {"metric": _REACH_METRICS})
+                ins_r = _get(f"{p['id']}/insights",
+                             {"metric": _MEDIA_VIEW_METRIC, "period": "lifetime"})
+                _parse_items(ins_r.get("data", []))
+            except Exception as e:
+                print(f"DEBUG post {p.get('id')} media-view error: {e}")
+
+            # ── 1b. Other numeric metrics (safe to batch) ─────────────────────
+            try:
+                ins = _get(f"{p['id']}/insights", {"metric": _OTHER_METRICS})
                 _parse_items(ins.get("data", []))
             except Exception as e:
-                print(f"DEBUG post {p.get('id')} reach metrics error: {e}")
+                print(f"DEBUG post {p.get('id')} other metrics error: {e}")
 
             # ── 2. Reactions breakdown (dict metric — isolated call) ───────────
             try:
@@ -574,14 +590,15 @@ def fetch_fb_posts(days: int = None, start: str = None, end: str = None, limit: 
                 print(f"DEBUG post {p.get('id')} reactions error: {e}")
 
             # ── 3. Normalization ───────────────────────────────────────────────
-            # For New Page Experience pages only _unique variants are returned.
-            # "reach" = post_impressions_unique (total unique accounts that saw post)
-            # "total_views" = same (no non-unique aggregate available)
-            # organic / paid / viral are also unique-reach breakdowns.
-            reach        = metrics.get("post_impressions_unique", 0)
-            org_imp      = metrics.get("post_impressions_organic_unique", 0)
-            impressions_paid = metrics.get("post_impressions_paid_unique", 0)
-            viral_imp    = metrics.get("post_impressions_viral_unique", 0)
+            # NOTE (2026-06-15 deprecation): "reach" now = post_total_media_view_unique
+            # (unique media views, paid+organic combined). The organic/paid/viral reach
+            # breakdowns were removed by Meta with no replacement — kept as 0 so the
+            # rest of the pipeline / cached historical rows stay shape-compatible.
+            reach        = metrics.get("post_total_media_view_unique",
+                                       metrics.get("post_impressions_unique", 0))  # fallback: old cached rows
+            org_imp      = metrics.get("post_impressions_organic_unique", 0)   # deprecated → 0
+            impressions_paid = metrics.get("post_impressions_paid_unique", 0)  # deprecated → 0
+            viral_imp    = metrics.get("post_impressions_viral_unique", 0)     # deprecated → 0
             video_views  = metrics.get("post_video_views", 0)
 
             # total_views: use reach (only total available); for video posts

@@ -84,9 +84,12 @@ FB_ENGAGEMENT_METRICS = [
     "page_actions_post_reactions_total",
 ]
 
+# NOTE (2026-06-15): Meta deprecated page_impressions / page_impressions_unique /
+# page_posts_impressions. Replacements: page_total_media_view_unique (unique reach,
+# paid+organic) and page_media_view (total media views). page_views_total still valid.
 FB_VISIBILITY_METRICS = [
-    "page_impressions",
-    "page_impressions_unique",
+    "page_total_media_view_unique",
+    "page_media_view",
     "page_views_total",
 ]
 
