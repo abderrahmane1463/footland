@@ -1066,7 +1066,14 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
     _df = pd.DataFrame(rows)
     _section_header("📊 Rapport Hebdomadaire Notoriété & Engagement")
 
-    _df_display = _df
+    _KPI_COLS = [
+        "Campaign name", "Objective", "Reach", "Impressions", "Frequency",
+        "Result type", "Results", "Amount spent (EUR)", "Starts", "Ends",
+        "Cost per result", "Delivery status", "Delivery level", "Link clicks",
+        "CPC (cost per link click)", "CPM (cost per 1,000 impressions)",
+        "CTR (all)", "Reporting starts", "Reporting ends",
+    ]
+    _df_display = _df[[c for c in _KPI_COLS if c in _df.columns]]
 
     _spacer, _dl_col = st.columns([3, 1])
     with _dl_col:
