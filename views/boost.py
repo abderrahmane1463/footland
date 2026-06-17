@@ -830,6 +830,23 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
         ]
 
         _ads_df = pd.DataFrame(ad_rows)
+
+        # ── Excel export — placed top-right, above the table (where Streamlit's
+        #    built-in CSV toolbar sits) ──────────────────────────────────────────
+        _spacer, _dl_col = st.columns([3, 1])
+        with _dl_col:
+            try:
+                st.download_button(
+                    "📥 Télécharger en Excel",
+                    data=_df_to_excel_bytes(_ads_df, sheet_name="Campagnes"),
+                    file_name="campagnes_footland.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_campaigns_xlsx",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.caption(f"Export Excel indisponible : {e}")
+
         st.dataframe(
             _ads_df,
             use_container_width=True,
@@ -838,18 +855,6 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
             selection_mode="multi-row",
             column_config=_csv_col_config(),
         )
-
-        # ── Excel export (alongside Streamlit's built-in CSV download) ─────────
-        try:
-            st.download_button(
-                "📥 Télécharger en Excel",
-                data=_df_to_excel_bytes(_ads_df, sheet_name="Campagnes"),
-                file_name="campagnes_footland.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_campaigns_xlsx",
-            )
-        except Exception as e:
-            st.caption(f"Export Excel indisponible : {e}")
     else:
         _no_data_banner("Aucune donnée ads disponible — les données adset/ads se chargent séparément.")
 
