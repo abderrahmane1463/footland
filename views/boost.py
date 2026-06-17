@@ -859,7 +859,7 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
 
         # ── Campaign-level KPI table — same filter, right below ───────────────
         st.divider()
-        _render_campaign_kpi_table(campaigns, adset_ad_data, selected_objectives=_sel_objs or None)
+        _render_campaign_kpi_table(campaigns, adset_ad_data)
     else:
         _no_data_banner("Aucune donnée ads disponible — les données adset/ads se chargent séparément.")
 
@@ -953,8 +953,23 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
                                selected_objectives: list[str] | None = None):
     """Campaign-level KPI table mirroring the Meta Ads Manager CSV export columns."""
     active = [c for c in campaigns if c.get("spend", 0) > 0 or c.get("impressions", 0) > 0]
-    if selected_objectives:
-        active = [c for c in active if c.get("objective", "—") in selected_objectives]
+    if not active:
+        return
+
+    # ── Own independent objective filter ──────────────────────────────────────
+    all_obj = sorted(set(c.get("objective", "—") for c in active if c.get("objective", "—") != "—"))
+    if all_obj:
+        _sel = st.multiselect(
+            "Filtrer par objectif",
+            options=all_obj,
+            default=all_obj,
+            label_visibility="collapsed",
+            placeholder="Sélectionner un ou plusieurs objectifs…",
+            key="obj_filter_camp_report",
+        )
+        if _sel:
+            active = [c for c in active if c.get("objective", "—") in _sel]
+
     if not active:
         return
 
