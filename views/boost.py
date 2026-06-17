@@ -974,7 +974,9 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
         return
 
     # ── Own independent objective filter ──────────────────────────────────────
-    all_obj = sorted(set(c.get("objective", "—") for c in active if c.get("objective", "—") != "—"))
+    _obj_order = ["OUTCOME_ENGAGEMENT", "OUTCOME_AWARENESS"]
+    _obj_set = set(c.get("objective", "—") for c in active if c.get("objective", "—") != "—")
+    all_obj = [o for o in _obj_order if o in _obj_set] + sorted(_obj_set - set(_obj_order))
     if all_obj:
         _sel = st.multiselect(
             "Filtrer par objectif",
