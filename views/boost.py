@@ -943,6 +943,134 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
             else:
                 st.caption("Aucune donnée adset disponible pour cette campagne.")
 
+    # ── Campaign-level KPI table (CSV-style, one row per campaign) ────────────
+    st.divider()
+    _render_campaign_kpi_table(campaigns, adset_ad_data)
+
+
+def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None = None):
+    """Campaign-level KPI table mirroring the Meta Ads Manager CSV export columns."""
+    active = [c for c in campaigns if c.get("spend", 0) > 0 or c.get("impressions", 0) > 0]
+    if not active:
+        return
+
+    period = (adset_ad_data or {}).get("period", {})
+    reporting_start = period.get("since", "—")
+    reporting_end   = period.get("until", "—")
+
+    # Build campaign start/end dates from ad-level rows (already enriched with campaign metadata)
+    camp_dates: dict[str, dict] = {}
+    for a in (adset_ad_data or {}).get("ads", []):
+        cname = a.get("campaign_name", "")
+        if cname and cname not in camp_dates:
+            camp_dates[cname] = {
+                "start": a.get("campaign_start", "—"),
+                "end":   a.get("campaign_end",   "—"),
+            }
+
+    _RESULT_TYPE_MAP = {
+        "OUTCOME_AWARENESS":     "Reach",
+        "OUTCOME_ENGAGEMENT":    "Post engagements",
+        "OUTCOME_SALES":         "Website purchases",
+        "CONVERSIONS":           "Website purchases",
+        "OUTCOME_TRAFFIC":       "Link clicks",
+        "OUTCOME_LEADS":         "Leads",
+        "OUTCOME_APP_PROMOTION": "App installs",
+    }
+
+    rows = []
+    for c in sorted(active, key=lambda x: x.get("spend", 0.0), reverse=True):
+        obj   = c.get("objective", "—")
+        spend = c.get("spend", 0.0)
+        reach = c.get("reach", 0)
+        lk    = c.get("link_clicks", 0)
+        conv  = c.get("conversions", 0)
+        imp   = c.get("impressions", 0)
+        freq  = c.get("frequency", 0.0)
+        name  = c.get("name", "—")
+
+        result_type = _RESULT_TYPE_MAP.get(obj, "—")
+        if obj == "OUTCOME_AWARENESS":
+            results = reach
+        elif obj == "OUTCOME_TRAFFIC":
+            results = lk
+        else:
+            results = conv
+
+        cost_per_result = round(spend / results, 4) if results else 0.0
+        cpm     = round(spend / imp * 1000, 4) if imp else 0.0
+        cpc_lnk = round(spend / lk,         4) if lk  else 0.0
+        dates   = camp_dates.get(name, {"start": "—", "end": "—"})
+
+        rows.append({
+            "Campaign name":                    name,
+            "Objective":                        obj,
+            "Reach":                            reach,
+            "Impressions":                      imp,
+            "Frequency":                        round(freq, 5),
+            "Result type":                      result_type,
+            "Results":                          results,
+            "Amount spent (EUR)":               round(spend, 2),
+            "Starts":                           dates["start"],
+            "Ends":                             dates["end"],
+            "Cost per result":                  cost_per_result,
+            "Delivery status":                  c.get("delivery_status", "—"),
+            "Delivery level":                   "campaign",
+            "Link clicks":                      lk,
+            "CPC (cost per link click)":        cpc_lnk,
+            "CPM (cost per 1,000 impressions)": cpm,
+            "CTR (all)":                        round(c.get("ctr", 0.0), 8),
+            "Reporting starts":                 reporting_start,
+            "Reporting ends":                   reporting_end,
+        })
+
+    if not rows:
+        return
+
+    _df = pd.DataFrame(rows)
+    _section_header("📊 RAPPORT PAR CAMPAGNE")
+
+    _spacer, _dl_col = st.columns([3, 1])
+    with _dl_col:
+        try:
+            st.download_button(
+                "📥 Télécharger en Excel",
+                data=_df_to_excel_bytes(_df, sheet_name="Rapport Campagnes"),
+                file_name="rapport_campagnes_footland.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_camp_report_xlsx",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.caption(f"Export Excel indisponible : {e}")
+
+    st.dataframe(
+        _df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Campaign name":                    st.column_config.TextColumn("Campaign name",                        width="large"),
+            "Objective":                        st.column_config.TextColumn("Objective",                            width="medium"),
+            "Reach":                            st.column_config.NumberColumn("Reach",                              format="%d"),
+            "Impressions":                      st.column_config.NumberColumn("Impressions",                        format="%d"),
+            "Frequency":                        st.column_config.NumberColumn("Frequency",                         format="%.5f"),
+            "Result type":                      st.column_config.TextColumn("Result type",                         width="medium"),
+            "Results":                          st.column_config.NumberColumn("Results",                            format="%d"),
+            "Amount spent (EUR)":               st.column_config.NumberColumn("Amount spent (EUR)",                format="€%.2f"),
+            "Starts":                           st.column_config.TextColumn("Starts",                               width="small"),
+            "Ends":                             st.column_config.TextColumn("Ends",                                 width="small"),
+            "Cost per result":                  st.column_config.NumberColumn("Cost per result",                   format="€%.4f"),
+            "Delivery status":                  st.column_config.TextColumn("Delivery status",                     width="medium"),
+            "Delivery level":                   st.column_config.TextColumn("Delivery level",                      width="small"),
+            "Link clicks":                      st.column_config.NumberColumn("Link clicks",                       format="%d"),
+            "CPC (cost per link click)":        st.column_config.NumberColumn("CPC (cost per link click)",        format="€%.4f"),
+            "CPM (cost per 1,000 impressions)": st.column_config.NumberColumn("CPM (cost per 1,000 impressions)", format="€%.4f"),
+            "CTR (all)":                        st.column_config.NumberColumn("CTR (all)",                         format="%.8f%%"),
+            "Reporting starts":                 st.column_config.TextColumn("Reporting starts",                    width="small"),
+            "Reporting ends":                   st.column_config.TextColumn("Reporting ends",                      width="small"),
+        },
+    )
+
 
 def _render_demographics(demo: dict):
     """Age / gender bar chart from Marketing API paid reach."""
