@@ -973,6 +973,8 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
     if not active:
         return
 
+    _section_header("📊 Rapport Hebdomadaire Notoriété & Engagement")
+
     # ── Own independent objective filter ──────────────────────────────────────
     _obj_order = ["OUTCOME_ENGAGEMENT", "OUTCOME_AWARENESS"]
     _obj_set = set(c.get("objective", "—") for c in active if c.get("objective", "—") != "—")
@@ -1066,7 +1068,6 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
         return
 
     _df = pd.DataFrame(rows)
-    _section_header("📊 Rapport Hebdomadaire Notoriété & Engagement")
 
     _KPI_COLS = [
         "Campaign name", "Objective", "Reach", "Impressions", "Frequency",
