@@ -814,10 +814,11 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
         _sel_objs: list[str] = []
         all_objectives = sorted(set(a.get("objective", "—") for a in ads if a.get("objective", "—") != "—"))
         if all_objectives:
+            _sales_default = [o for o in all_objectives if "SALES" in o] or all_objectives
             _sel_objs = st.multiselect(
                 "Filtrer par objectif",
                 options=all_objectives,
-                default=all_objectives,
+                default=_sales_default,
                 label_visibility="collapsed",
                 placeholder="Sélectionner un ou plusieurs objectifs…",
                 key="obj_filter_table",
@@ -980,10 +981,11 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
     _obj_set = set(c.get("objective", "—") for c in active if c.get("objective", "—") != "—")
     all_obj = [o for o in _obj_order if o in _obj_set] + sorted(_obj_set - set(_obj_order))
     if all_obj:
+        _non_sales_default = [o for o in all_obj if "SALES" not in o] or all_obj
         _sel = st.multiselect(
             "Filtrer par objectif",
             options=all_obj,
-            default=all_obj,
+            default=_non_sales_default,
             label_visibility="collapsed",
             placeholder="Sélectionner un ou plusieurs objectifs…",
             key="obj_filter_camp_report",
