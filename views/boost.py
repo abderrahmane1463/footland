@@ -615,33 +615,6 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
             if aid:
                 ads_by_adset.setdefault(str(aid), []).append(a)
 
-    # ── Summary bar ───────────────────────────────────────────────────────────
-    _dark    = st.session_state.get("theme", "dark") == "dark"
-    _sum_bg  = "rgba(255,255,255,0.04)" if _dark else "#f9fafb"
-    _sum_brd = "rgba(255,255,255,0.1)"  if _dark else "#e5e7eb"
-    _sum_tc  = "rgba(255,255,255,0.6)"  if _dark else "#4b5563"
-    _sum_vc  = "#ffffff"                 if _dark else "#111827"
-    _note_c  = "rgba(255,255,255,0.3)"  if _dark else "#9ca3af"
-
-    total_spend = sum(c.get("spend", 0.0)    for c in campaigns)
-    total_imp   = sum(c.get("impressions", 0) for c in campaigns)
-    total_clks  = sum(c.get("clicks", 0)      for c in campaigns)
-    total_conv  = sum(c.get("conversions", 0) for c in campaigns)
-    inactive_note = f' <span style="color:{_note_c};">· {inactive} sans activité masquées</span>' if inactive else ""
-
-    st.markdown(
-        f'<div style="background:{_sum_bg};border:1px solid {_sum_brd};'
-        f'border-radius:8px;padding:0.6rem 1rem;margin-bottom:0.8rem;font-size:0.8rem;'
-        f'color:{_sum_tc};display:flex;gap:2rem;flex-wrap:wrap;align-items:center;">'
-        f'<span>📁 <b style="color:{_sum_vc};">{total_active}</b> campagnes actives{inactive_note}</span>'
-        f'<span>💰 Total dépensé : <b style="color:#f97316;">€{total_spend:,.2f}</b></span>'
-        f'<span>📢 Impressions : <b style="color:{_sum_vc};">{total_imp:,}</b></span>'
-        f'<span>🖱️ Clics : <b style="color:{_sum_vc};">{total_clks:,}</b></span>'
-        f'<span>✅ Commandes : <b style="color:#a78bfa;">{total_conv:,}</b></span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
     # ── Flat ads table — same columns as Meta CSV export ─────────────────────
     ads = (adset_ad_data or {}).get("ads", [])
     period = (adset_ad_data or {}).get("period", {})
