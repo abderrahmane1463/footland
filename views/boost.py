@@ -153,13 +153,16 @@ def _no_data_banner(msg: str = "Aucune donnée publicitaire disponible pour cett
     )
 
 
-def _metric_picker(all_cols: list[str], fixed_cols: list[str], key: str) -> list[str]:
+def _metric_picker(all_cols: list[str], fixed_cols: list[str], key: str,
+                   default_cols: list[str] | None = None) -> list[str]:
     """
     Expander listing ALL Meta Marketing API metrics (not just what is in the DataFrame).
     Returns fixed_cols + selected metrics. Metrics not yet in the DataFrame are added
     as empty columns when the caller renders the table.
+    default_cols: explicit list of columns to pre-select (overrides the "all in df" default).
     """
     in_df = set(all_cols)
+    _default_set = set(default_cols) if default_cols is not None else in_df
 
     # Complete Meta Marketing API metric catalogue — column display names
     _GROUPS: dict[str, list[str]] = {
@@ -247,7 +250,7 @@ def _metric_picker(all_cols: list[str], fixed_cols: list[str], key: str) -> list
             opts    = [c for c in group_metrics if c not in fixed_cols]
             if not opts:
                 continue
-            default = [c for c in opts if c in in_df]  # pre-select only what's in the data
+            default = [c for c in opts if c in _default_set]
             with g_cols[g_idx % 3]:
                 st.markdown(
                     f'<div style="font-size:0.78rem;font-weight:700;'
@@ -945,9 +948,26 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
 
         _ads_df = pd.DataFrame(ad_rows)
 
-        # ── Column picker ─────────────────────────────────────────────────────
+        # ── Column picker — default matches the Ads Manager CSV export ──────────
         _FIXED_AD = ["Campaign name", "Ad set name", "Ad name"]
-        _visible_ads = _metric_picker(list(_ads_df.columns), _FIXED_AD, "picker_ads")
+        _CSV_DEFAULTS = [
+            "Ad name", "Campaign name", "Delivery status", "Delivery level", "Ad set name",
+            "Objective", "Result type", "Results", "Cost per result", "Amount spent (EUR)",
+            "Campaign Budget", "Campaign Budget Type", "Ad Set Budget", "Ad Set Budget Type",
+            "Reach", "Cost per 1,000 Meta Accounts reached",
+            "Impressions", "CPM (cost per 1,000 impressions)", "Frequency",
+            "Clicks (all)", "CPC (all)", "Link clicks", "CPC (cost per link click)",
+            "CTR (all)", "CTR (link click-through rate)",
+            "Outbound clicks", "Cost per outbound click",
+            "Website landing page views", "Cost per landing page view",
+            "Adds to cart", "Website adds to cart", "Cost per add to cart",
+            "Checkouts initiated", "Website checkouts initiated", "Cost per checkout initiated",
+            "Purchases", "Website purchases", "Cost per purchase",
+            "Engagement rate ranking", "Quality ranking", "Conversion rate ranking",
+            "Reporting starts", "Reporting ends",
+        ]
+        _visible_ads = _metric_picker(list(_ads_df.columns), _FIXED_AD, "picker_ads",
+                                      default_cols=_CSV_DEFAULTS)
         for _c in _visible_ads:
             if _c not in _ads_df.columns:
                 _ads_df[_c] = "—"
