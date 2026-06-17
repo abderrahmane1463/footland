@@ -153,129 +153,6 @@ def _no_data_banner(msg: str = "Aucune donnée publicitaire disponible pour cett
     )
 
 
-def _metric_picker(all_cols: list[str], fixed_cols: list[str], key: str,
-                   default_cols: list[str] | None = None) -> list[str]:
-    """
-    Expander listing ALL Meta Marketing API metrics (not just what is in the DataFrame).
-    Returns fixed_cols + selected metrics. Metrics not yet in the DataFrame are added
-    as empty columns when the caller renders the table.
-    default_cols: explicit list of columns to pre-select (overrides the "all in df" default).
-    """
-    in_df = set(all_cols)
-    _default_set = set(default_cols) if default_cols is not None else in_df
-
-    # Complete Meta Marketing API metric catalogue — column display names
-    _GROUPS: dict[str, list[str]] = {
-        "📊 Performance": [
-            "Impressions", "Reach", "Frequency",
-            "Clicks (all)", "Link clicks", "Outbound clicks",
-            "Post engagement", "Page engagement",
-            "Photo views",
-        ],
-        "📈 Taux (CTR)": [
-            "CTR (all)", "CTR (link click-through rate)",
-            "Outbound CTR (click-through rate)",
-        ],
-        "💰 Coûts": [
-            "Amount spent (EUR)",
-            "CPM (cost per 1,000 impressions)",
-            "Cost per 1,000 Meta Accounts reached",
-            "CPC (all)", "CPC (cost per link click)",
-            "Cost per outbound click",
-            "Cost per result",
-            "Cost per landing page view",
-            "Cost per add to cart",
-            "Cost per checkout initiated",
-            "Cost per purchase",
-            "Cost per lead",
-            "Cost per app install",
-        ],
-        "🎯 Conversions": [
-            "Result type", "Results",
-            "Purchases", "Website purchases",
-            "Website purchase value",
-            "Purchase ROAS (return on ad spend)",
-            "Adds to cart", "Website adds to cart",
-            "Checkouts initiated", "Website checkouts initiated",
-            "Website landing page views",
-            "Website leads",
-            "App installs",
-        ],
-        "▶️ Vidéo": [
-            "Video plays",
-            "ThruPlays",
-            "Video plays at 25%",
-            "Video plays at 50%",
-            "Video plays at 75%",
-            "Video plays at 100%",
-            "Video average play time (sec)",
-        ],
-        "👍 Engagement": [
-            "Post reactions",
-            "Post comments",
-            "Post shares",
-            "Post saves",
-            "Page likes",
-        ],
-        "⭐ Qualité": [
-            "Quality ranking",
-            "Engagement rate ranking",
-            "Conversion rate ranking",
-        ],
-        "ℹ️ Campagne": [
-            "Objective", "Delivery status", "Delivery level",
-            "Campaign Budget", "Campaign Budget Type",
-            "Ad Set Budget", "Ad Set Budget Type",
-            "Start", "End",
-            "Reporting starts", "Reporting ends",
-        ],
-    }
-
-    _dark  = st.session_state.get("theme", "dark") == "dark"
-    _hdr_c = "rgba(255,255,255,0.55)" if _dark else "#6b7280"
-    _na_c  = "rgba(255,255,255,0.3)"  if _dark else "#9ca3af"
-
-    with st.expander("📊 Personnaliser les colonnes", expanded=False):
-        st.caption(
-            f"Colonnes fixes (toujours affichées) : **{', '.join(fixed_cols)}**  \n"
-            f"<span style='color:{_na_c};font-size:0.75rem;'>"
-            f"Les métriques grisées ne sont pas encore dans les données actuelles.</span>",
-            unsafe_allow_html=True,
-        )
-        selected: list[str] = []
-        g_cols = st.columns(3)
-        g_idx  = 0
-        for group_name, group_metrics in _GROUPS.items():
-            # All metrics in this group that aren't fixed
-            opts    = [c for c in group_metrics if c not in fixed_cols]
-            if not opts:
-                continue
-            default = [c for c in opts if c in _default_set]
-            with g_cols[g_idx % 3]:
-                st.markdown(
-                    f'<div style="font-size:0.78rem;font-weight:700;'
-                    f'color:{_hdr_c};margin-bottom:4px;">{group_name}</div>',
-                    unsafe_allow_html=True,
-                )
-                picked = st.multiselect(
-                    group_name,
-                    options=opts,
-                    default=default,
-                    label_visibility="collapsed",
-                    key=f"{key}_{group_name}",
-                )
-                selected.extend(picked)
-            g_idx += 1
-
-    selected_set = set(selected) | set(fixed_cols)
-    if default_cols:
-        # Return in the exact order of default_cols, then any extras at the end
-        ordered = [c for c in default_cols if c in selected_set]
-        extras  = [c for c in selected if c not in set(default_cols) and c not in set(fixed_cols)]
-        return ordered + extras
-    return list(fixed_cols) + selected
-
-
 def _section_header(title: str, big: bool = True):
     _brd = "rgba(255,255,255,0.15)"
     st.markdown(
@@ -954,9 +831,8 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
 
         _ads_df = pd.DataFrame(ad_rows)
 
-        # ── Column picker — default matches the Ads Manager CSV export ──────────
-        _FIXED_AD = ["Campaign name", "Ad set name", "Ad name"]
-        _CSV_DEFAULTS = [
+        # ── Fixed column order matching Ads Manager CSV export ───────────────────
+        _CSV_COLS = [
             "Ad name", "Campaign name", "Delivery status", "Delivery level", "Ad set name",
             "Objective", "Result type", "Results", "Cost per result", "Amount spent (EUR)",
             "Campaign Budget", "Campaign Budget Type", "Ad Set Budget", "Ad Set Budget Type",
@@ -972,12 +848,7 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
             "Engagement rate ranking", "Quality ranking", "Conversion rate ranking",
             "Reporting starts", "Reporting ends",
         ]
-        _visible_ads = _metric_picker(list(_ads_df.columns), _FIXED_AD, "picker_ads",
-                                      default_cols=_CSV_DEFAULTS)
-        for _c in _visible_ads:
-            if _c not in _ads_df.columns:
-                _ads_df[_c] = "—"
-        _ads_display = _ads_df[_visible_ads]
+        _ads_display = _ads_df[[c for c in _CSV_COLS if c in _ads_df.columns]]
 
         # ── Excel export ──────────────────────────────────────────────────────
         _spacer, _dl_col = st.columns([3, 1])
@@ -1195,13 +1066,7 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
     _df = pd.DataFrame(rows)
     _section_header("📊 Rapport Hebdomadaire Notoriété & Engagement")
 
-    # ── Column picker ─────────────────────────────────────────────────────────
-    _FIXED_CAMP = ["Campaign name"]
-    _visible_camp = _metric_picker(list(_df.columns), _FIXED_CAMP, "picker_camp")
-    for _c in _visible_camp:
-        if _c not in _df.columns:
-            _df[_c] = "—"
-    _df_display = _df[_visible_camp]
+    _df_display = _df
 
     _spacer, _dl_col = st.columns([3, 1])
     with _dl_col:
