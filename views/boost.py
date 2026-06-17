@@ -15,12 +15,22 @@ TODO: replace `empty_boost_data()` calls in views/facebook.py with
 
 from __future__ import annotations
 
+import io
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from components.charts import get_chart_layout
 from api.boost import fetch_reach_for_ids
+
+
+def _df_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Campagnes") -> bytes:
+    """Serialize a DataFrame to .xlsx bytes for st.download_button."""
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
+    return buffer.getvalue()
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -819,14 +829,27 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
             for a in sorted(ads, key=lambda x: (x.get("campaign_created", ""), x.get("campaign_name", "")), reverse=True)
         ]
 
+        _ads_df = pd.DataFrame(ad_rows)
         st.dataframe(
-            pd.DataFrame(ad_rows),
+            _ads_df,
             use_container_width=True,
             hide_index=True,
             on_select="rerun",
             selection_mode="multi-row",
             column_config=_csv_col_config(),
         )
+
+        # ── Excel export (alongside Streamlit's built-in CSV download) ─────────
+        try:
+            st.download_button(
+                "📥 Télécharger en Excel",
+                data=_df_to_excel_bytes(_ads_df, sheet_name="Campagnes"),
+                file_name="campagnes_footland.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_campaigns_xlsx",
+            )
+        except Exception as e:
+            st.caption(f"Export Excel indisponible : {e}")
     else:
         _no_data_banner("Aucune donnée ads disponible — les données adset/ads se chargent séparément.")
 
