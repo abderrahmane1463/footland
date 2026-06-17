@@ -267,6 +267,12 @@ def _metric_picker(all_cols: list[str], fixed_cols: list[str], key: str,
                 selected.extend(picked)
             g_idx += 1
 
+    selected_set = set(selected) | set(fixed_cols)
+    if default_cols:
+        # Return in the exact order of default_cols, then any extras at the end
+        ordered = [c for c in default_cols if c in selected_set]
+        extras  = [c for c in selected if c not in set(default_cols) and c not in set(fixed_cols)]
+        return ordered + extras
     return list(fixed_cols) + selected
 
 
