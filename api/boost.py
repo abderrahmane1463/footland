@@ -33,10 +33,20 @@ AD_ACCOUNT_ID = BLOCKED_AD_ACCOUNTS[0]   # "act_765947885726761"
 # Meta action types that represent a purchase / conversion.
 # Use only "purchase" (the unified de-duplicated count Meta exposes).
 # "offsite_conversion.fb_pixel_purchase" is the same event and would double-count.
-_PURCHASE_TYPES       = {"purchase"}
-_ADD_TO_CART_TYPES    = {"offsite_conversion.fb_pixel_add_to_cart"}
-_CHECKOUT_TYPES       = {"offsite_conversion.fb_pixel_initiate_checkout"}
-_LANDING_PAGE_TYPES   = {"landing_page_view"}
+_PURCHASE_TYPES        = {"purchase"}
+_ADD_TO_CART_TYPES     = {"offsite_conversion.fb_pixel_add_to_cart"}
+_CHECKOUT_TYPES        = {"offsite_conversion.fb_pixel_initiate_checkout"}
+_LANDING_PAGE_TYPES    = {"landing_page_view"}
+_POST_ENGAGEMENT_TYPES = {"post_engagement"}
+_PAGE_ENGAGEMENT_TYPES = {"page_engagement"}
+_POST_REACTION_TYPES   = {"post_reaction"}
+_POST_COMMENT_TYPES    = {"comment"}
+_POST_SHARE_TYPES      = {"post"}
+_POST_SAVE_TYPES       = {"onsite_conversion.post_save"}
+_PAGE_LIKE_TYPES       = {"like"}
+_PHOTO_VIEW_TYPES      = {"photo_view"}
+_LEAD_TYPES            = {"lead", "offsite_conversion.fb_pixel_lead"}
+_APP_INSTALL_TYPES     = {"mobile_app_install", "app_install"}
 
 # Campaign objectives that count as "conversion" campaigns
 _CONV_OBJECTIVES = {"CONVERSIONS", "OUTCOME_SALES"}
@@ -115,6 +125,20 @@ def _purchase_value(action_values: list) -> float:
         for a in (action_values or [])
         if a.get("action_type") in _PURCHASE_TYPES
     )
+
+
+def _video_action_val(field) -> int:
+    """Sum values from a Meta video action list field (e.g. video_play_actions)."""
+    if not field or not isinstance(field, list):
+        return 0
+    return sum(int(float(v.get("value", 0))) for v in field)
+
+
+def _video_avg_time(field) -> float:
+    """Average video play time in seconds from video_avg_time_watched_actions."""
+    if not field or not isinstance(field, list):
+        return 0.0
+    return round(sum(float(v.get("value", 0)) for v in field), 2)
 
 
 def _safe_float(val, default=0.0) -> float:
@@ -593,8 +617,11 @@ def fetch_adset_ad_insights(
         "impressions,reach,clicks,inline_link_clicks,"
         "spend,cpc,ctr,frequency,"
         "outbound_clicks,"
+        "video_play_actions,video_p25_watched_actions,video_p50_watched_actions,"
+        "video_p75_watched_actions,video_p100_watched_actions,"
+        "video_avg_time_watched_actions,video_thruplay_watched_actions,"
         "quality_ranking,engagement_rate_ranking,conversion_rate_ranking,"
-        "actions,cost_per_action_type"
+        "actions,cost_per_action_type,action_values"
     )
 
     def _parse_adset_row(r):
@@ -632,11 +659,40 @@ def fetch_adset_ad_insights(
         adset_id = r.get("adset_id", "")
         ad_id    = r.get("ad_id", "")
 
+        # Video metrics
+        vid_plays  = _video_action_val(r.get("video_play_actions"))
+        vid_p25    = _video_action_val(r.get("video_p25_watched_actions"))
+        vid_p50    = _video_action_val(r.get("video_p50_watched_actions"))
+        vid_p75    = _video_action_val(r.get("video_p75_watched_actions"))
+        vid_p100   = _video_action_val(r.get("video_p100_watched_actions"))
+        vid_time   = _video_avg_time(r.get("video_avg_time_watched_actions"))
+        thruplays  = _video_action_val(r.get("video_thruplay_watched_actions"))
+
+        # Engagement breakdown
+        post_eng   = _action_count(actions, _POST_ENGAGEMENT_TYPES)
+        page_eng   = _action_count(actions, _PAGE_ENGAGEMENT_TYPES)
+        reactions  = _action_count(actions, _POST_REACTION_TYPES)
+        comments   = _action_count(actions, _POST_COMMENT_TYPES)
+        shares     = _action_count(actions, _POST_SHARE_TYPES)
+        saves      = _action_count(actions, _POST_SAVE_TYPES)
+        page_likes = _action_count(actions, _PAGE_LIKE_TYPES)
+        photo_views= _action_count(actions, _PHOTO_VIEW_TYPES)
+        leads      = _action_count(actions, _LEAD_TYPES)
+        app_inst   = _action_count(actions, _APP_INSTALL_TYPES)
+
+        # Cost per lead / install
+        cost_lead = _cost_for_type(cpa_list, _LEAD_TYPES) or (round(spend / leads, 4) if leads else 0.0)
+        cost_app  = _cost_for_type(cpa_list, _APP_INSTALL_TYPES) or (round(spend / app_inst, 4) if app_inst else 0.0)
+
+        # ROAS & purchase value
+        action_values_list = r.get("action_values") or []
+        purch_value = _purchase_value(action_values_list)
+        roas        = round(purch_value / spend, 2) if spend else 0.0
+
         camp  = _camp_meta.get(camp_id, {})
         adset = _adset_meta.get(adset_id, {})
 
         def _fmt_date(iso: str) -> str:
-            """Extract YYYY-MM-DD from an ISO datetime string."""
             return iso[:10] if iso and len(iso) >= 10 else "—"
 
         _start = camp.get("start_time", "")
@@ -675,6 +731,7 @@ def fetch_adset_ad_insights(
             "ctr":                 _safe_float(r.get("ctr")),
             "ctr_link":            round(lk / imp * 100, 4) if imp else 0.0,
             "outbound_clicks":     out,
+            "outbound_ctr":        round(out / imp * 100, 4) if imp else 0.0,
             "cost_per_outbound":   round(spend / out, 4) if out else 0.0,
             "landing_page_views":  lp,
             "cost_per_lp_view":    _cost_for_type(cpa_list, _LANDING_PAGE_TYPES) or (round(spend / lp, 4) if lp else 0.0),
@@ -685,6 +742,31 @@ def fetch_adset_ad_insights(
             "quality_ranking":     r.get("quality_ranking", "—"),
             "engagement_ranking":  r.get("engagement_rate_ranking", "—"),
             "conversion_ranking":  r.get("conversion_rate_ranking", "—"),
+            # Video
+            "video_plays":         vid_plays,
+            "video_p25":           vid_p25,
+            "video_p50":           vid_p50,
+            "video_p75":           vid_p75,
+            "video_p100":          vid_p100,
+            "video_avg_time":      vid_time,
+            "thruplays":           thruplays,
+            # Engagement breakdown
+            "post_engagement":     post_eng,
+            "page_engagement":     page_eng,
+            "post_reactions":      reactions,
+            "post_comments":       comments,
+            "post_shares":         shares,
+            "post_saves":          saves,
+            "page_likes":          page_likes,
+            "photo_views":         photo_views,
+            # Leads & installs
+            "leads":               leads,
+            "cost_per_lead":       cost_lead,
+            "app_installs":        app_inst,
+            "cost_per_app_install":cost_app,
+            # Revenue
+            "purchase_value":      purch_value,
+            "roas":                roas,
         }
 
     # ── Adset level ───────────────────────────────────────────────────────────

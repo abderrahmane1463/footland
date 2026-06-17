@@ -155,48 +155,99 @@ def _no_data_banner(msg: str = "Aucune donnée publicitaire disponible pour cett
 
 def _metric_picker(all_cols: list[str], fixed_cols: list[str], key: str) -> list[str]:
     """
-    Expander with grouped metric checkboxes. Returns fixed_cols + user-selected columns
-    in the original DataFrame column order.
+    Expander listing ALL Meta Marketing API metrics (not just what is in the DataFrame).
+    Returns fixed_cols + selected metrics. Metrics not yet in the DataFrame are added
+    as empty columns when the caller renders the table.
     """
-    optional = [c for c in all_cols if c not in fixed_cols]
+    in_df = set(all_cols)
 
+    # Complete Meta Marketing API metric catalogue — column display names
     _GROUPS: dict[str, list[str]] = {
-        "📊 Audience":     ["Reach", "Impressions", "Frequency"],
-        "🖱️ Clics":        ["Link clicks", "Clicks (all)", "Outbound clicks",
-                            "CTR (all)", "CTR (link click-through rate)",
-                            "Website landing page views"],
-        "💰 Coûts":        ["Amount spent (EUR)", "CPC (cost per link click)", "CPC (all)",
-                            "CPM (cost per 1,000 impressions)",
-                            "Cost per 1,000 Meta Accounts reached",
-                            "Cost per result", "Cost per landing page view",
-                            "Cost per add to cart", "Cost per checkout initiated",
-                            "Cost per purchase", "Cost per outbound click"],
-        "🎯 Conversions":  ["Result type", "Results", "Purchases", "Website purchases",
-                            "Adds to cart", "Website adds to cart",
-                            "Checkouts initiated", "Website checkouts initiated"],
-        "⭐ Qualité":      ["Quality ranking", "Engagement rate ranking",
-                            "Conversion rate ranking"],
-        "ℹ️ Campagne":     ["Objective", "Delivery status", "Delivery level",
-                            "Campaign Budget", "Campaign Budget Type",
-                            "Ad Set Budget", "Ad Set Budget Type",
-                            "Starts", "Ends", "Start", "End",
-                            "Reporting starts", "Reporting ends"],
+        "📊 Performance": [
+            "Impressions", "Reach", "Frequency",
+            "Clicks (all)", "Link clicks", "Outbound clicks",
+            "Post engagement", "Page engagement",
+            "Photo views",
+        ],
+        "📈 Taux (CTR)": [
+            "CTR (all)", "CTR (link click-through rate)",
+            "Outbound CTR (click-through rate)",
+        ],
+        "💰 Coûts": [
+            "Amount spent (EUR)",
+            "CPM (cost per 1,000 impressions)",
+            "Cost per 1,000 Meta Accounts reached",
+            "CPC (all)", "CPC (cost per link click)",
+            "Cost per outbound click",
+            "Cost per result",
+            "Cost per landing page view",
+            "Cost per add to cart",
+            "Cost per checkout initiated",
+            "Cost per purchase",
+            "Cost per lead",
+            "Cost per app install",
+        ],
+        "🎯 Conversions": [
+            "Result type", "Results",
+            "Purchases", "Website purchases",
+            "Website purchase value",
+            "Purchase ROAS (return on ad spend)",
+            "Adds to cart", "Website adds to cart",
+            "Checkouts initiated", "Website checkouts initiated",
+            "Website landing page views",
+            "Website leads",
+            "App installs",
+        ],
+        "▶️ Vidéo": [
+            "Video plays",
+            "ThruPlays",
+            "Video plays at 25%",
+            "Video plays at 50%",
+            "Video plays at 75%",
+            "Video plays at 100%",
+            "Video average play time (sec)",
+        ],
+        "👍 Engagement": [
+            "Post reactions",
+            "Post comments",
+            "Post shares",
+            "Post saves",
+            "Page likes",
+        ],
+        "⭐ Qualité": [
+            "Quality ranking",
+            "Engagement rate ranking",
+            "Conversion rate ranking",
+        ],
+        "ℹ️ Campagne": [
+            "Objective", "Delivery status", "Delivery level",
+            "Campaign Budget", "Campaign Budget Type",
+            "Ad Set Budget", "Ad Set Budget Type",
+            "Start", "End",
+            "Reporting starts", "Reporting ends",
+        ],
     }
 
     _dark  = st.session_state.get("theme", "dark") == "dark"
     _hdr_c = "rgba(255,255,255,0.55)" if _dark else "#6b7280"
+    _na_c  = "rgba(255,255,255,0.3)"  if _dark else "#9ca3af"
 
     with st.expander("📊 Personnaliser les colonnes", expanded=False):
         st.caption(
-            f"Colonnes fixes (toujours affichées) : **{', '.join(fixed_cols)}**"
+            f"Colonnes fixes (toujours affichées) : **{', '.join(fixed_cols)}**  \n"
+            f"<span style='color:{_na_c};font-size:0.75rem;'>"
+            f"Les métriques grisées ne sont pas encore dans les données actuelles.</span>",
+            unsafe_allow_html=True,
         )
         selected: list[str] = []
         g_cols = st.columns(3)
         g_idx  = 0
         for group_name, group_metrics in _GROUPS.items():
-            in_group = [c for c in group_metrics if c in optional]
-            if not in_group:
+            # All metrics in this group that aren't fixed
+            opts    = [c for c in group_metrics if c not in fixed_cols]
+            if not opts:
                 continue
+            default = [c for c in opts if c in in_df]  # pre-select only what's in the data
             with g_cols[g_idx % 3]:
                 st.markdown(
                     f'<div style="font-size:0.78rem;font-weight:700;'
@@ -205,17 +256,15 @@ def _metric_picker(all_cols: list[str], fixed_cols: list[str], key: str) -> list
                 )
                 picked = st.multiselect(
                     group_name,
-                    options=in_group,
-                    default=in_group,
+                    options=opts,
+                    default=default,
                     label_visibility="collapsed",
                     key=f"{key}_{group_name}",
                 )
                 selected.extend(picked)
             g_idx += 1
 
-    # Preserve original column order
-    selected_set = set(selected)
-    return [c for c in all_cols if c in fixed_cols or c in selected_set]
+    return list(fixed_cols) + selected
 
 
 def _section_header(title: str, big: bool = True):
@@ -779,9 +828,35 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
             "Purchases":                          conv,
             "Website purchases":                  conv,
             "Cost per purchase":                  round(a.get("cpa", 0.0), 2),
+            "Purchase ROAS (return on ad spend)": round(a.get("roas", 0.0), 2),
+            "Website purchase value":             round(a.get("purchase_value", 0.0), 2),
             "Engagement rate ranking":            a.get("engagement_ranking", "—"),
             "Quality ranking":                    a.get("quality_ranking", "—"),
             "Conversion rate ranking":            a.get("conversion_ranking", "—"),
+            # Video
+            "Video plays":                        a.get("video_plays", 0),
+            "ThruPlays":                          a.get("thruplays", 0),
+            "Video plays at 25%":                 a.get("video_p25", 0),
+            "Video plays at 50%":                 a.get("video_p50", 0),
+            "Video plays at 75%":                 a.get("video_p75", 0),
+            "Video plays at 100%":                a.get("video_p100", 0),
+            "Video average play time (sec)":      a.get("video_avg_time", 0.0),
+            # Engagement
+            "Post engagement":                    a.get("post_engagement", 0),
+            "Page engagement":                    a.get("page_engagement", 0),
+            "Post reactions":                     a.get("post_reactions", 0),
+            "Post comments":                      a.get("post_comments", 0),
+            "Post shares":                        a.get("post_shares", 0),
+            "Post saves":                         a.get("post_saves", 0),
+            "Page likes":                         a.get("page_likes", 0),
+            "Photo views":                        a.get("photo_views", 0),
+            # Outbound CTR
+            "Outbound CTR (click-through rate)":  round(a.get("outbound_ctr", 0.0), 4),
+            # Leads & installs
+            "Website leads":                      a.get("leads", 0),
+            "Cost per lead":                      round(a.get("cost_per_lead", 0.0), 4),
+            "App installs":                       a.get("app_installs", 0),
+            "Cost per app install":               round(a.get("cost_per_app_install", 0.0), 4),
             "Reporting starts":                   reporting_start,
             "Reporting ends":                     reporting_end,
             "Start":                              a.get("campaign_start", "—"),
@@ -873,7 +948,10 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
         # ── Column picker ─────────────────────────────────────────────────────
         _FIXED_AD = ["Campaign name", "Ad set name", "Ad name"]
         _visible_ads = _metric_picker(list(_ads_df.columns), _FIXED_AD, "picker_ads")
-        _ads_display = _ads_df[[c for c in _ads_df.columns if c in _visible_ads]]
+        for _c in _visible_ads:
+            if _c not in _ads_df.columns:
+                _ads_df[_c] = "—"
+        _ads_display = _ads_df[_visible_ads]
 
         # ── Excel export ──────────────────────────────────────────────────────
         _spacer, _dl_col = st.columns([3, 1])
@@ -1094,7 +1172,10 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
     # ── Column picker ─────────────────────────────────────────────────────────
     _FIXED_CAMP = ["Campaign name"]
     _visible_camp = _metric_picker(list(_df.columns), _FIXED_CAMP, "picker_camp")
-    _df_display = _df[[c for c in _df.columns if c in _visible_camp]]
+    for _c in _visible_camp:
+        if _c not in _df.columns:
+            _df[_c] = "—"
+    _df_display = _df[_visible_camp]
 
     _spacer, _dl_col = st.columns([3, 1])
     with _dl_col:
