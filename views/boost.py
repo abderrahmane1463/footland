@@ -1260,7 +1260,7 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
         "🎯 Conversion",
         "🗂️ Par Objectif",
         "🏆 Top #3 Campagnes",
-        "📋 Tableau Ads",
+        "📋 Rapport",
         "👥 Démographie & Géo",
     ])
 
