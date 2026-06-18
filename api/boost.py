@@ -14,6 +14,7 @@ replace it for this endpoint).
 import json
 import time
 import requests
+from datetime import datetime, timezone
 
 from config import (
     ADS_ACCESS_TOKEN,
@@ -47,9 +48,65 @@ _PAGE_LIKE_TYPES       = {"like"}
 _PHOTO_VIEW_TYPES      = {"photo_view"}
 _LEAD_TYPES            = {"lead", "offsite_conversion.fb_pixel_lead"}
 _APP_INSTALL_TYPES     = {"mobile_app_install", "app_install"}
-
 # Campaign objectives that count as "conversion" campaigns
 _CONV_OBJECTIVES = {"CONVERSIONS", "OUTCOME_SALES"}
+
+# Meta ad-set optimization_goal → ("Result type" label, key into the result-source dict).
+# This mirrors how Ads Manager picks the Results column: it follows the
+# optimization goal, NOT just the campaign objective. e.g. an OUTCOME_AWARENESS
+# campaign optimized for video views reports "2-Second Continuous Video View",
+# while one optimized for reach reports "Reach".
+_OPTIM_RESULT_MAP = {
+    "REACH":                             ("Reach",                          "reach"),
+    "IMPRESSIONS":                       ("Impressions",                    "impressions"),
+    "TWO_SECOND_CONTINUOUS_VIDEO_VIEWS": ("2-Second Continuous Video View", "video_2s"),
+    "THRUPLAY":                          ("ThruPlays",                      "thruplays"),
+    "POST_ENGAGEMENT":                   ("Post engagements",               "post_engagement"),
+    "PAGE_LIKES":                        ("Page likes",                     "page_likes"),
+    "LINK_CLICKS":                       ("Link clicks",                    "link_clicks"),
+    "LANDING_PAGE_VIEWS":                ("Landing page views",             "landing_page_views"),
+    "OFFSITE_CONVERSIONS":               ("Website purchases",              "purchases"),
+    "LEAD_GENERATION":                   ("Leads",                          "leads"),
+    "QUALITY_LEAD":                      ("Leads",                          "leads"),
+    "APP_INSTALLS":                      ("App installs",                   "app_installs"),
+}
+
+# Fallback result type by objective when no optimization_goal is available.
+_OBJECTIVE_RESULT_MAP = {
+    "OUTCOME_AWARENESS":     ("Reach",             "reach"),
+    "OUTCOME_ENGAGEMENT":    ("Post engagements",  "post_engagement"),
+    "OUTCOME_SALES":         ("Website purchases", "purchases"),
+    "CONVERSIONS":           ("Website purchases", "purchases"),
+    "OUTCOME_TRAFFIC":       ("Link clicks",       "link_clicks"),
+    "OUTCOME_LEADS":         ("Leads",             "leads"),
+    "OUTCOME_APP_PROMOTION": ("App installs",      "app_installs"),
+}
+
+
+def _derive_delivery_status(effective_status: str, stop_time: str) -> str:
+    """Map Meta effective_status (+ schedule) to the lowercase delivery label
+    Ads Manager shows: active / recently_completed / completed / paused / …"""
+    es = (effective_status or "").upper()
+    if es == "ACTIVE" and stop_time:
+        try:
+            stop_dt = datetime.fromisoformat(stop_time.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            if stop_dt < now:
+                days = (now - stop_dt).days
+                return "recently_completed" if days <= 10 else "completed"
+        except Exception:
+            pass
+    return {
+        "ACTIVE":          "active",
+        "PAUSED":          "paused",
+        "CAMPAIGN_PAUSED": "paused",
+        "ADSET_PAUSED":    "paused",
+        "ARCHIVED":        "archived",
+        "DELETED":         "deleted",
+        "IN_PROCESS":      "in_process",
+        "WITH_ISSUES":     "with_issues",
+        "DISAPPROVED":     "with_issues",
+    }.get(es, es.lower() or "—")
 
 
 # ─── Internal HTTP layer (no block-guard) ─────────────────────────────────────
@@ -201,6 +258,7 @@ def fetch_boost_insights(
         "impressions,reach,clicks,inline_link_clicks,"
         "spend,cpc,ctr,frequency,"
         "outbound_clicks,"
+        "video_continuous_2_sec_watched_actions,video_thruplay_watched_actions,"
         "quality_ranking,engagement_rate_ranking,conversion_rate_ranking,"
         "actions,cost_per_action_type,action_values"
     )
@@ -240,24 +298,41 @@ def fetch_boost_insights(
     _camp_meta: dict[str, dict] = {}
     try:
         resp_meta = _get_ads(f"{AD_ACCOUNT_ID}/campaigns", {
-            "fields": "id,effective_status,daily_budget,lifetime_budget",
+            "fields": "id,effective_status,daily_budget,lifetime_budget,stop_time",
             "limit":  500,
         })
         for c in resp_meta.get("data", []):
             cid = c.get("id", "")
             daily    = _safe_float(c.get("daily_budget",    0)) / 100
             lifetime = _safe_float(c.get("lifetime_budget", 0)) / 100
+            stop     = c.get("stop_time", "")
             if daily > 0:
                 _camp_meta[cid] = {"status": c.get("effective_status", "—"),
-                                   "budget": daily, "budget_type": "Daily"}
+                                   "budget": daily, "budget_type": "Daily", "stop_time": stop}
             elif lifetime > 0:
                 _camp_meta[cid] = {"status": c.get("effective_status", "—"),
-                                   "budget": lifetime, "budget_type": "Lifetime"}
+                                   "budget": lifetime, "budget_type": "Lifetime", "stop_time": stop}
             else:
                 _camp_meta[cid] = {"status": c.get("effective_status", "—"),
-                                   "budget": 0.0, "budget_type": "—"}
+                                   "budget": 0.0, "budget_type": "—", "stop_time": stop}
     except Exception as e:
         print(f"DEBUG boost: campaign meta fetch error: {e}")
+
+    # Fetch each campaign's optimization goal (from its ad sets). Ads Manager
+    # derives the Results column from this, not from the campaign objective.
+    _camp_optim: dict[str, str] = {}
+    try:
+        resp_as = _get_ads(f"{AD_ACCOUNT_ID}/adsets", {
+            "fields": "campaign_id,optimization_goal",
+            "limit":  500,
+        })
+        for a in resp_as.get("data", []):
+            cid = a.get("campaign_id", "")
+            goal = a.get("optimization_goal", "")
+            if cid and goal and cid not in _camp_optim:
+                _camp_optim[cid] = goal
+    except Exception as e:
+        print(f"DEBUG boost: adset optimization_goal fetch error: {e}")
 
     if not footland_ids:
         return out
@@ -339,6 +414,11 @@ def fetch_boost_insights(
             add_cart_val    = _action_count(actions, _ADD_TO_CART_TYPES)
             checkout_val    = _action_count(actions, _CHECKOUT_TYPES)
             post_eng_val    = _action_count(actions, _POST_ENGAGEMENT_TYPES)
+            video_2s_val    = _video_action_val(r.get("video_continuous_2_sec_watched_actions"))
+            thruplay_val    = _video_action_val(r.get("video_thruplay_watched_actions"))
+            leads_val       = _action_count(actions, _LEAD_TYPES)
+            app_installs_val = _action_count(actions, _APP_INSTALL_TYPES)
+            page_likes_val  = _action_count(actions, _PAGE_LIKE_TYPES)
             cost_lp_val     = _cost_for_type(cpa_list, _LANDING_PAGE_TYPES)
             cost_cart_val   = _cost_for_type(cpa_list, _ADD_TO_CART_TYPES)
             cost_chk_val    = _cost_for_type(cpa_list, _CHECKOUT_TYPES)
@@ -350,15 +430,49 @@ def fetch_boost_insights(
 
             meta = _camp_meta.get(camp_id, {})
 
+            # Result type & Results — follow the ad-set optimization goal
+            # (Ads Manager behaviour), falling back to the campaign objective.
+            _result_sources = {
+                "reach":              reach_val,
+                "impressions":        imp_val,
+                "video_2s":           video_2s_val,
+                "thruplays":          thruplay_val,
+                "post_engagement":    post_eng_val,
+                "page_likes":         page_likes_val,
+                "link_clicks":        link_clicks_val,
+                "landing_page_views": lp_views_val,
+                "purchases":          purchases,
+                "leads":              leads_val,
+                "app_installs":       app_installs_val,
+            }
+            _goal = _camp_optim.get(camp_id, "")
+            _rt_map = _OPTIM_RESULT_MAP.get(_goal) or _OBJECTIVE_RESULT_MAP.get(objective)
+            if _rt_map:
+                result_type_val, _src_key = _rt_map
+                results_val = _result_sources.get(_src_key, 0)
+            else:
+                result_type_val, results_val = "—", 0
+            cost_per_result_val = round(spend_val / results_val, 4) if results_val else 0.0
+
+            delivery_val = _derive_delivery_status(meta.get("status", ""), meta.get("stop_time", ""))
+
             campaigns.append({
                 "campaign_id":            camp_id,
                 "name":                   r.get("campaign_name", "—"),
                 "objective":              objective,
-                "delivery_status":        meta.get("status", "—"),
+                "optimization_goal":      _goal,
+                "delivery_status":        delivery_val,
                 "budget":                 meta.get("budget", 0.0),
                 "budget_type":            meta.get("budget_type", "—"),
                 "spend":                  spend_val,
                 "conversions":            purchases,
+                "result_type":            result_type_val,
+                "results":                results_val,
+                "cost_per_result":        cost_per_result_val,
+                "video_2s_views":         video_2s_val,
+                "thruplays":              thruplay_val,
+                "leads":                  leads_val,
+                "app_installs":           app_installs_val,
                 "post_engagement":        post_eng_val,
                 "cost_per_post_engagement": cost_post_eng_val,
                 "cpa":                    cpa_val if cpa_val else (spend_val / purchases if purchases else 0.0),

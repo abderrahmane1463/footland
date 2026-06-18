@@ -1010,14 +1010,16 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
                 "end":   a.get("campaign_end",   "—"),
             }
 
+    # Fallback result-type map (used only if the API didn't resolve a result
+    # type from the ad-set optimization goal).
     _RESULT_TYPE_MAP = {
-        "OUTCOME_AWARENESS":     "Reach",
-        "OUTCOME_ENGAGEMENT":    "Post engagements",
-        "OUTCOME_SALES":         "Website purchases",
-        "CONVERSIONS":           "Website purchases",
-        "OUTCOME_TRAFFIC":       "Link clicks",
-        "OUTCOME_LEADS":         "Leads",
-        "OUTCOME_APP_PROMOTION": "App installs",
+        "OUTCOME_AWARENESS":     ("Reach",             "reach"),
+        "OUTCOME_ENGAGEMENT":    ("Post engagements",  "post_engagement"),
+        "OUTCOME_SALES":         ("Website purchases", "conversions"),
+        "CONVERSIONS":           ("Website purchases", "conversions"),
+        "OUTCOME_TRAFFIC":       ("Link clicks",       "link_clicks"),
+        "OUTCOME_LEADS":         ("Leads",             "leads"),
+        "OUTCOME_APP_PROMOTION": ("App installs",      "app_installs"),
     }
 
     rows = []
@@ -1031,17 +1033,17 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
         freq  = c.get("frequency", 0.0)
         name  = c.get("name", "—")
 
-        result_type = _RESULT_TYPE_MAP.get(obj, "—")
-        if obj == "OUTCOME_AWARENESS":
-            results = reach
-        elif obj == "OUTCOME_ENGAGEMENT":
-            results = c.get("post_engagement", 0)
-        elif obj == "OUTCOME_TRAFFIC":
-            results = lk
-        else:
-            results = conv
-
-        cost_per_result = round(spend / results, 4) if results else 0.0
+        # Prefer the result type/count resolved by the API from the optimization
+        # goal; fall back to the objective-based map if absent.
+        result_type = c.get("result_type") or "—"
+        results     = c.get("results")
+        if results is None:
+            _rt, _src = _RESULT_TYPE_MAP.get(obj, ("—", ""))
+            result_type = _rt
+            results = c.get(_src, 0) if _src else 0
+        cost_per_result = c.get("cost_per_result")
+        if cost_per_result is None:
+            cost_per_result = round(spend / results, 4) if results else 0.0
         cpm     = round(spend / imp * 1000, 4) if imp else 0.0
         cpc_lnk = round(spend / lk,         4) if lk  else 0.0
         dates   = camp_dates.get(name, {"start": "—", "end": "—"})
