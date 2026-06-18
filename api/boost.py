@@ -338,9 +338,11 @@ def fetch_boost_insights(
             lp_views_val    = _action_count(actions, _LANDING_PAGE_TYPES)
             add_cart_val    = _action_count(actions, _ADD_TO_CART_TYPES)
             checkout_val    = _action_count(actions, _CHECKOUT_TYPES)
+            post_eng_val    = _action_count(actions, _POST_ENGAGEMENT_TYPES)
             cost_lp_val     = _cost_for_type(cpa_list, _LANDING_PAGE_TYPES)
             cost_cart_val   = _cost_for_type(cpa_list, _ADD_TO_CART_TYPES)
             cost_chk_val    = _cost_for_type(cpa_list, _CHECKOUT_TYPES)
+            cost_post_eng_val = _cost_for_type(cpa_list, _POST_ENGAGEMENT_TYPES)
             cpm_val         = round(spend_val / imp_val * 1000, 4) if imp_val else 0.0
             cpc_link_val    = round(spend_val / link_clicks_val, 4) if link_clicks_val else 0.0
             ctr_link_val    = round(link_clicks_val / imp_val * 100, 4) if imp_val else 0.0
@@ -357,6 +359,8 @@ def fetch_boost_insights(
                 "budget_type":            meta.get("budget_type", "—"),
                 "spend":                  spend_val,
                 "conversions":            purchases,
+                "post_engagement":        post_eng_val,
+                "cost_per_post_engagement": cost_post_eng_val,
                 "cpa":                    cpa_val if cpa_val else (spend_val / purchases if purchases else 0.0),
                 "clicks":                 clicks_val,
                 "link_clicks":            link_clicks_val,

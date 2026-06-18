@@ -1034,6 +1034,8 @@ def _render_campaign_kpi_table(campaigns: list[dict], adset_ad_data: dict | None
         result_type = _RESULT_TYPE_MAP.get(obj, "—")
         if obj == "OUTCOME_AWARENESS":
             results = reach
+        elif obj == "OUTCOME_ENGAGEMENT":
+            results = c.get("post_engagement", 0)
         elif obj == "OUTCOME_TRAFFIC":
             results = lk
         else:
