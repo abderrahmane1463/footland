@@ -137,6 +137,46 @@ def _get_ads(endpoint: str, params: dict) -> dict:
     return {}
 
 
+def _get_ads_all_pages(endpoint: str, params: dict, max_pages: int = 40) -> list:
+    """
+    GET against the Meta Marketing API, following `paging.next` until
+    exhausted (or max_pages reached). Returns the concatenated `data` list.
+
+    Without this, any edge with more rows than the requested `limit` would
+    silently drop everything past the first page — e.g. older campaigns in
+    a shared agency ad account that has accumulated more than 500 campaigns
+    across all of its clients.
+    """
+    resp = _get_ads(endpoint, params)
+    all_data: list = list(resp.get("data", []))
+    next_url = resp.get("paging", {}).get("next")
+    pages = 1
+
+    while next_url and pages < max_pages:
+        pages += 1
+        page_json: dict = {}
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                r = requests.get(next_url, timeout=REQUEST_TIMEOUT)
+                if r.status_code == 429:
+                    time.sleep(RETRY_BACKOFF ** attempt)
+                    continue
+                r.raise_for_status()
+                page_json = r.json()
+                break
+            except requests.exceptions.RequestException as exc:
+                print(f"DEBUG ads: pagination request failed (attempt {attempt}): {exc}")
+                if attempt == MAX_RETRIES:
+                    page_json = {}
+                else:
+                    time.sleep(RETRY_BACKOFF ** attempt)
+
+        all_data.extend(page_json.get("data", []))
+        next_url = page_json.get("paging", {}).get("next")
+
+    return all_data
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def _purchases(actions: list) -> int:
     return sum(
@@ -214,15 +254,14 @@ def _safe_int(val, default=0) -> int:
 
 # ─── Shared helpers ───────────────────────────────────────────────────────────
 def _get_footland_ids() -> list:
-    """Fetch all Footland campaign IDs from the ad account."""
+    """Fetch all Footland campaign IDs from the ad account (all pages)."""
     try:
-        resp = _get_ads(f"{AD_ACCOUNT_ID}/campaigns", {
+        all_camps = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/campaigns", {
             "fields": "id,name",
             "limit":  500,
         })
-        all_camps = resp.get("data", [])
         ids = [c["id"] for c in all_camps if any(kw in c.get("name", "") for kw in FOOTLAND_CAMPAIGN_KEYWORDS)]
-        print(f"DEBUG boost: {len(ids)} Footland campaign IDs found")
+        print(f"DEBUG boost: {len(ids)} Footland campaign IDs found (out of {len(all_camps)} total in account)")
         return ids
     except Exception as e:
         print(f"DEBUG boost: _get_footland_ids error: {e}")
@@ -297,11 +336,11 @@ def fetch_boost_insights(
     # Fetch delivery status and budget per campaign
     _camp_meta: dict[str, dict] = {}
     try:
-        resp_meta = _get_ads(f"{AD_ACCOUNT_ID}/campaigns", {
+        camps_meta_data = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/campaigns", {
             "fields": "id,effective_status,daily_budget,lifetime_budget,stop_time",
             "limit":  500,
         })
-        for c in resp_meta.get("data", []):
+        for c in camps_meta_data:
             cid = c.get("id", "")
             daily    = _safe_float(c.get("daily_budget",    0)) / 100
             lifetime = _safe_float(c.get("lifetime_budget", 0)) / 100
@@ -322,11 +361,11 @@ def fetch_boost_insights(
     # derives the Results column from this, not from the campaign objective.
     _camp_optim: dict[str, str] = {}
     try:
-        resp_as = _get_ads(f"{AD_ACCOUNT_ID}/adsets", {
+        adsets_optim_data = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/adsets", {
             "fields": "campaign_id,optimization_goal",
             "limit":  500,
         })
-        for a in resp_as.get("data", []):
+        for a in adsets_optim_data:
             cid = a.get("campaign_id", "")
             goal = a.get("optimization_goal", "")
             if cid and goal and cid not in _camp_optim:
@@ -361,14 +400,13 @@ def fetch_boost_insights(
     # ── 3. Campaign-level insights (Footland only) ────────────────────────────
     try:
         # Ensure the time_range is strictly passed to prevent lifetime defaults
-        resp = _get_ads(f"{AD_ACCOUNT_ID}/insights", {
+        rows = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/insights", {
             "level":      "campaign",
             "fields":     _FIELDS,
             "filtering":  _FILTERING,
             "time_range": time_range,
             "limit":      500,
         })
-        rows = resp.get("data", [])
 
         campaigns    = []
         conv_ids:    list[str]        = []   # campaign IDs with conversion objective
@@ -661,11 +699,11 @@ def fetch_adset_ad_insights(
     # then keep only Footland ones.
     _camp_meta: dict[str, dict] = {}
     try:
-        resp = _get_ads(f"{AD_ACCOUNT_ID}/campaigns", {
+        all_camps_meta = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/campaigns", {
             "fields": "id,objective,effective_status,daily_budget,lifetime_budget,created_time,start_time,stop_time",
             "limit":  500,
         })
-        for c in resp.get("data", []):
+        for c in all_camps_meta:
             cid = c.get("id", "")
             if cid not in footland_set:
                 continue
@@ -688,12 +726,12 @@ def fetch_adset_ad_insights(
     # ── 2. Adset metadata (budget) ────────────────────────────────────────────
     _adset_meta: dict[str, dict] = {}
     try:
-        resp = _get_ads(f"{AD_ACCOUNT_ID}/adsets", {
+        all_adsets_meta = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/adsets", {
             "fields":    "id,campaign_id,daily_budget,lifetime_budget,start_time,end_time",
             "filtering": _CAMP_ID_FILTER,
             "limit":     500,
         })
-        for a in resp.get("data", []):
+        for a in all_adsets_meta:
             aid   = a.get("id", "")
             daily = _safe_float(a.get("daily_budget",    0)) / 100
             life  = _safe_float(a.get("lifetime_budget", 0)) / 100
@@ -890,14 +928,14 @@ def fetch_adset_ad_insights(
     # ── Adset level ───────────────────────────────────────────────────────────
     adsets = []
     try:
-        resp = _get_ads(f"{AD_ACCOUNT_ID}/insights", {
+        adset_rows = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/insights", {
             "level":      "adset",
             "fields":     _ADSET_FIELDS,
             "filtering":  _FILTERING,
             "time_range": time_range,
             "limit":      500,
         })
-        for r in resp.get("data", []):
+        for r in adset_rows:
             adsets.append(_parse_adset_row(r))
         print(f"DEBUG adset insights: {len(adsets)} adsets")
     except Exception as e:
@@ -906,14 +944,14 @@ def fetch_adset_ad_insights(
     # ── Ad level ──────────────────────────────────────────────────────────────
     ads = []
     try:
-        resp = _get_ads(f"{AD_ACCOUNT_ID}/insights", {
+        ad_rows = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/insights", {
             "level":      "ad",
             "fields":     _AD_FIELDS,
             "filtering":  _FILTERING,
             "time_range": time_range,
             "limit":      500,
         })
-        for r in resp.get("data", []):
+        for r in ad_rows:
             ads.append(_parse_ad_row(r))
         print(f"DEBUG ad insights: {len(ads)} ads")
     except Exception as e:
