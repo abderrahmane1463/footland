@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from components.ai_insights import render_ai_insights
 from components.charts import get_chart_layout
 
 
@@ -548,6 +549,10 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
 
     with t1:
         _render_overview(ga4_data.get("overview", {}))
+        render_ai_insights(
+            "Google Analytics — trafic du site footland.dz",
+            st.session_state.get("ctx_ga4"),
+        )
         st.divider()
         _render_traffic_sources(ga4_data.get("traffic_sources", []))
 

@@ -121,7 +121,7 @@ def render_documentation():
     with col4:
         st.info("📊 **Google Analytics** — Vue d'ensemble + Sources de trafic, E-commerce (Parcours d'achat + Top articles), Événements, Audience (Géographie + Appareils)")
     with col5:
-        st.info("🤖 **Assistant IA** — Chatbot flottant (Groq / GPT-OSS) répondant aux questions sur les données affichées dans le dashboard")
+        st.info("🤖 **Intelligence Artificielle** — Analyse automatique affichée sur chaque plateforme + chatbot flottant (Groq / GPT-OSS) répondant aux questions sur les données affichées")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -471,10 +471,26 @@ Affiché immédiatement après le tableau Sales, avec son propre filtre et son p
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Assistant IA ──────────────────────────────────────────────────────────
-    st.markdown('<div class="doc-section-title">🤖 Assistant IA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="doc-section-title">🤖 Intelligence Artificielle</div>', unsafe_allow_html=True)
 
     st.markdown("""
-<p style="color:#a1a1aa;font-size:14px;">Un assistant conversationnel flottant, propulsé par <strong>Groq</strong> (modèles GPT-OSS 120B / 20B), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
+<p style="color:#E8420A;font-size:15px;font-weight:700;">🧠 Analyse automatique</p>
+<p style="color:#a1a1aa;font-size:13px;">
+Un bloc d'analyse rédigé automatiquement s'affiche en haut de chaque plateforme
+(Facebook, Instagram, Boost, Google Analytics). Il résume les KPIs de la période
+sélectionnée sous forme de points clés et de recommandations concrètes.
+</p><br>
+<table class="kpi-table">
+  <tr><th>Fonctionnalité</th><th>Description</th><th>Détail technique</th></tr>
+  <tr><td class="kpi-name">📍 Emplacement</td><td class="kpi-desc">Facebook et Instagram : au-dessus des onglets. Boost : onglet Global, sous les KPIs. Google Analytics : onglet Vue d'ensemble.</td><td><span class="endpoint">components/ai_insights.py</span></td></tr>
+  <tr><td class="kpi-name">📝 Format</td><td class="kpi-desc">« Ce qu'il faut retenir » (2–3 constats chiffrés) puis « Recommandations » (1–2 actions concrètes). 130 mots maximum.</td><td><span class="endpoint">—</span></td></tr>
+  <tr><td class="kpi-name">🔒 Fiabilité des chiffres</td><td class="kpi-desc">Le modèle a interdiction de calculer une nouvelle métrique (ratio, moyenne, pourcentage). Il reprend uniquement les valeurs déjà calculées par le dashboard, avec leur unité — ce qui évite les erreurs de calcul dans un document client.</td><td><span class="endpoint">SYSTEM_PROMPT</span></td></tr>
+  <tr><td class="kpi-name">⚡ Coût & rapidité</td><td class="kpi-desc">Le résultat est mis en cache sur les données elles-mêmes : une même période ne déclenche qu'un seul appel API, quel que soit le nombre d'interactions avec le dashboard. Régénéré uniquement quand les chiffres changent (ou via « 🔄 Refresh Data »).</td><td><span class="endpoint">st.cache_data(ttl=3600)</span></td></tr>
+  <tr><td class="kpi-name">🛡️ Tolérance aux pannes</td><td class="kpi-desc">Si l'IA est indisponible, le bloc disparaît simplement — le reste du dashboard n'est jamais bloqué.</td><td><span class="endpoint">—</span></td></tr>
+</table>
+<br>
+<p style="color:#E8420A;font-size:15px;font-weight:700;">💬 Assistant conversationnel</p>
+<p style="color:#a1a1aa;font-size:14px;">Un assistant flottant, propulsé par <strong>Groq</strong> (modèles GPT-OSS 120B / 20B), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
 <table class="kpi-table">
   <tr><th>Fonctionnalité</th><th>Description</th><th>Détail technique</th></tr>
   <tr><td class="kpi-name">💬 Ouverture / fermeture</td><td class="kpi-desc">Bouton "💬 Assistant IA" en bas de la barre latérale. Le bouton devient "✕ Fermer l'assistant" quand le panneau est ouvert.</td><td><span class="endpoint">st.session_state.chat_open</span></td></tr>

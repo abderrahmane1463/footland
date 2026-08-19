@@ -6,6 +6,7 @@ import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import db
+from components.ai_insights import render_ai_insights
 from components.charts import get_chart_layout, series_to_df, safe_sum, render_top3_podium
 from components.skeleton import skeleton_dashboard_html, skeleton_charts_html
 
@@ -375,6 +376,11 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
         period_label,
         "✅ Data Loaded",
         f"Followers: {total_fans}, Posts: {len(posts)}, Reach: {total_reach}"
+    )
+
+    render_ai_insights(
+        "Facebook — performance de la page (organique)",
+        st.session_state.get("ctx_facebook"),
     )
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
