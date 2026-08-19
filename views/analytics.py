@@ -552,6 +552,7 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
         render_ai_insights(
             "Google Analytics — trafic du site footland.dz",
             st.session_state.get("ctx_ga4"),
+            key="ga4",
         )
         st.divider()
         _render_traffic_sources(ga4_data.get("traffic_sources", []))

@@ -280,6 +280,7 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     render_ai_insights(
         "Instagram — performance du compte (organique)",
         st.session_state.get("ctx_instagram"),
+        key="instagram",
     )
 
     # ── Tabs ──────────────────────────────────────────────────────────────────

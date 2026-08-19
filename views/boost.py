@@ -1332,6 +1332,7 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
         render_ai_insights(
             "Boost — campagnes publicitaires payantes Meta",
             st.session_state.get("ctx_boost"),
+            key="boost",
         )
         st.divider()
         _render_conversion_campaigns(conv, prev_conv)

@@ -1,12 +1,14 @@
 """
-components/ai_insights.py — Auto-generated AI commentary for dashboard sections.
+components/ai_insights.py — On-demand AI commentary for dashboard sections.
 
-Renders a short, client-facing analysis of the KPIs currently on screen.
+Renders a short, client-facing analysis of the KPIs currently on screen, behind
+a button so nothing is generated until someone actually asks for it.
 Reuses the Groq client, API key resolution and markdown renderer from
 components/chatbot.py so both features stay on the same model configuration.
 
-The generation is cached on the data payload itself, so a given set of numbers
-costs exactly one API call no matter how many times Streamlit reruns the script.
+The result is cached on the data payload itself, so re-opening the same period
+is instant and free; changing the period brings the button back rather than
+leaving a stale analysis under a different set of figures.
 """
 
 import streamlit as st
@@ -171,11 +173,16 @@ def _card_html(body_html: str, dark: bool) -> str:
     )
 
 
-def render_ai_insights(section_label: str, ctx: dict | None):
-    """Render an auto-generated analysis block for a dashboard section.
+def render_ai_insights(section_label: str, ctx: dict | None, *, key: str):
+    """Render an on-demand analysis block for a dashboard section.
 
-    Silently renders nothing when there is no data or the model is unavailable —
-    an analysis block is a bonus, it must never break the dashboard.
+    Shows a button; the analysis is generated only when the user asks for it,
+    then stays visible for as long as the underlying numbers don't change.
+    Changing the period (or platform) brings the button back rather than
+    leaving a stale analysis sitting under a different set of figures.
+
+    Renders nothing when there is no data or the model is unavailable — an
+    analysis block is a bonus, it must never break the dashboard.
 
     Parameters
     ----------
@@ -183,6 +190,8 @@ def render_ai_insights(section_label: str, ctx: dict | None):
                     (e.g. "Boost — campagnes payantes Meta").
     ctx           : the section's KPI dict (the same ctx_* payload the chatbot
                     uses). Falsy ⇒ nothing is rendered.
+    key           : unique widget key for this section (Streamlit requires
+                    distinct keys, and all four views call this function).
     """
     if not ctx:
         return
@@ -191,10 +200,21 @@ def render_ai_insights(section_label: str, ctx: dict | None):
     if not payload:
         return
 
+    # Remembers which payload the user asked about. Comparing against the
+    # current payload is what makes a period change reset the block.
+    state_key = f"ai_insights_{key}"
+
+    if st.session_state.get(state_key) != payload:
+        if not st.button("🧠 Générer l'analyse", key=f"btn_{state_key}"):
+            return
+        st.session_state[state_key] = payload
+
     try:
         with st.spinner("Analyse des données en cours…"):
             analysis = _generate(section_label, payload)
     except Exception:  # noqa: BLE001 - never let this break the page
+        st.caption("⚠️ L'analyse n'a pas pu être générée. Réessayez dans un instant.")
+        st.session_state.pop(state_key, None)
         return
 
     dark = st.session_state.get("theme", "dark") == "dark"

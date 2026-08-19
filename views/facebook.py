@@ -381,6 +381,7 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
     render_ai_insights(
         "Facebook — performance de la page (organique)",
         st.session_state.get("ctx_facebook"),
+        key="facebook",
     )
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
