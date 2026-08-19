@@ -3,7 +3,7 @@ components/chatbot.py — AI Assistant (Groq) for the Footland Analytics dashboa
 
 Floating chat panel that can answer questions about the data currently
 displayed on screen (Facebook, Instagram, Boost, Google Analytics) using
-Groq's free Llama models.
+Groq's free hosted models.
 """
 
 import os
@@ -83,7 +83,9 @@ plutôt que d'inventer un chiffre. Tu peux aussi expliquer comment un KPI est ca
 ou d'où il provient (cf. limitations ci-dessus).
 """
 
-GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+# Primary model, then a smaller/faster fallback used on rate limits.
+# The previous llama-3.x models were decommissioned by Groq (404 model_not_found).
+GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
 
 
 # ─── API key resolution ──────────────────────────────────────────────────────
@@ -162,14 +164,21 @@ def _get_groq_response(history):
                 temperature=0.7,
                 max_tokens=1024,
             )
-            return response.choices[0].message.content
+            content = (response.choices[0].message.content or "").strip()
+            # Reasoning models spend part of the budget thinking; if the whole
+            # budget went to reasoning, content comes back empty — fall through
+            # to the next model rather than showing an empty bubble.
+            if content:
+                return content
+            continue
         except Exception as e:
             err = str(e)
             if "429" in err or "rate_limit" in err.lower():
                 continue
             return f"⚠️ Erreur : {err}"
 
-    return "⚠️ Les deux modèles ont atteint leur limite quotidienne. Réessayez dans quelques heures."
+    return ("⚠️ Aucune réponse n'a pu être générée (limite quotidienne atteinte "
+            "ou réponse vide). Réessayez dans quelques instants.")
 
 
 # ─── Markdown → HTML helpers ─────────────────────────────────────────────────

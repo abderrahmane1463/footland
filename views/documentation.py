@@ -121,7 +121,7 @@ def render_documentation():
     with col4:
         st.info("📊 **Google Analytics** — Vue d'ensemble + Sources de trafic, E-commerce (Parcours d'achat + Top articles), Événements, Audience (Géographie + Appareils)")
     with col5:
-        st.info("🤖 **Assistant IA** — Chatbot flottant (Groq / LLaMA 3.3) répondant aux questions sur les données affichées dans le dashboard")
+        st.info("🤖 **Assistant IA** — Chatbot flottant (Groq / GPT-OSS) répondant aux questions sur les données affichées dans le dashboard")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -474,11 +474,11 @@ Affiché immédiatement après le tableau Sales, avec son propre filtre et son p
     st.markdown('<div class="doc-section-title">🤖 Assistant IA</div>', unsafe_allow_html=True)
 
     st.markdown("""
-<p style="color:#a1a1aa;font-size:14px;">Un assistant conversationnel flottant, propulsé par <strong>Groq</strong> (modèles LLaMA 3.3 70B / 3.1 8B), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
+<p style="color:#a1a1aa;font-size:14px;">Un assistant conversationnel flottant, propulsé par <strong>Groq</strong> (modèles GPT-OSS 120B / 20B), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
 <table class="kpi-table">
   <tr><th>Fonctionnalité</th><th>Description</th><th>Détail technique</th></tr>
   <tr><td class="kpi-name">💬 Ouverture / fermeture</td><td class="kpi-desc">Bouton "💬 Assistant IA" en bas de la barre latérale. Le bouton devient "✕ Fermer l'assistant" quand le panneau est ouvert.</td><td><span class="endpoint">st.session_state.chat_open</span></td></tr>
-  <tr><td class="kpi-name">🧠 Modèle IA</td><td class="kpi-desc">LLaMA 3.3 70B Versatile en priorité ; bascule automatiquement sur LLaMA 3.1 8B Instant si la limite quotidienne du premier modèle est atteinte.</td><td><span class="endpoint">Groq API — chat.completions</span></td></tr>
+  <tr><td class="kpi-name">🧠 Modèle IA</td><td class="kpi-desc">GPT-OSS 120B en priorité ; bascule automatiquement sur GPT-OSS 20B si la limite quotidienne du premier modèle est atteinte.</td><td><span class="endpoint">Groq API — chat.completions</span></td></tr>
   <tr><td class="kpi-name">📊 Contexte des données</td><td class="kpi-desc">L'assistant connaît les KPIs de la période et de l'onglet actuellement affichés (Facebook, Instagram, Boost, Google Analytics) — uniquement les sections déjà visitées dans la session en cours.</td><td><span class="endpoint">ctx_facebook / ctx_instagram / ctx_boost / ctx_ga4</span></td></tr>
   <tr><td class="kpi-name">🌐 Langue</td><td class="kpi-desc">Répond en français, en s'appuyant sur les données réelles du dashboard ; indique clairement si une donnée n'est pas disponible plutôt que d'inventer un chiffre.</td><td><span class="endpoint">—</span></td></tr>
   <tr><td class="kpi-name">🗑️ Effacer la conversation</td><td class="kpi-desc">Bouton visible quand le panneau est ouvert et qu'il y a des messages — réinitialise l'historique de discussion.</td><td><span class="endpoint">st.session_state.chat_history</span></td></tr>

@@ -23,7 +23,7 @@ See `.env.example` for the full list of environment variables required
 app.py                    Streamlit entry point — routing, theming, prefetch threads
   ├── components/
   │   ├── sidebar.py       Platform selector, date range picker, refresh button
-  │   ├── chatbot.py        Floating AI assistant (Groq / LLaMA)
+  │   ├── chatbot.py        Floating AI assistant (Groq / GPT-OSS)
   │   ├── charts.py         Shared Plotly chart helpers
   │   └── skeleton.py        Loading-state shimmer placeholders
   ├── views/
@@ -72,7 +72,7 @@ app.py                    Streamlit entry point — routing, theming, prefetch t
 
 A floating chatbot (bottom-right, toggle via the sidebar "💬 Assistant IA"
 button) answers questions about the data currently shown on screen, using
-Groq (`llama-3.3-70b-versatile`, falling back to `llama-3.1-8b-instant`).
+Groq (`openai/gpt-oss-120b`, falling back to `openai/gpt-oss-20b`).
 Requires `GROQ_API_KEY`. See the in-app **Documentation** tab for details.
 
 ## Logging
