@@ -312,7 +312,11 @@ def render_ai_report(section_label: str, ctx: dict | None, *, key: str,
     state_key = f"ai_report_{key}"
 
     if st.session_state.get(state_key) != payload:
-        if not st.button("🧠 Générer le rapport d'analyse", key=f"btn_{state_key}"):
+        # Discreet by design: the report sits at the bottom of the page as an
+        # option, not as something competing with the KPIs for attention.
+        st.markdown("<div style='margin-top:1.5rem;'></div>", unsafe_allow_html=True)
+        if not st.button("🧠 Générer le rapport d'analyse",
+                         key=f"btn_{state_key}", type="tertiary"):
             return
         st.session_state[state_key] = payload
 

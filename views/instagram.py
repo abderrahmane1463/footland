@@ -300,14 +300,6 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
         }.items() if v
     }
 
-    render_ai_report(
-        "Instagram — compte footland.dz (organique)",
-        st.session_state.get("ctx_instagram"),
-        key="instagram",
-        kind="social",
-        extra_notes=paid_spend_note(),
-    )
-
     # ── Tabs ──────────────────────────────────────────────────────────────────
     tab1, tab2 = st.tabs([
         "📡Visibility", "💬Engagement"
@@ -602,3 +594,12 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
         if reach_df.empty:
             st.info("No visibility data available for this period.")
 
+
+    # Discreet entry point at the bottom of the page.
+    render_ai_report(
+        "Instagram — compte footland.dz (organique)",
+        st.session_state.get("ctx_instagram"),
+        key="instagram",
+        kind="social",
+        extra_notes=paid_spend_note(),
+    )

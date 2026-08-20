@@ -1356,12 +1356,6 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
 
     with t1:
         _render_global_kpis(totals, prev_totals)
-        render_ai_report(
-            "Publicité Meta (Boost) — campagnes payantes Footland",
-            st.session_state.get("ctx_boost"),
-            key="boost",
-            kind="ads",
-        )
         st.divider()
         _render_conversion_campaigns(conv, prev_conv)
 
@@ -1384,3 +1378,13 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
         _render_demographics(demo)
         st.divider()
         _render_geographic(demo)
+
+
+    # Discreet entry point at the bottom of the page — the report is an option,
+    # not something competing with the KPIs above for attention.
+    render_ai_report(
+        "Publicité Meta (Boost) — campagnes payantes Footland",
+        st.session_state.get("ctx_boost"),
+        key="boost",
+        kind="ads",
+    )

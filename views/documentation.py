@@ -476,13 +476,13 @@ Affiché immédiatement après le tableau Sales, avec son propre filtre et son p
     st.markdown("""
 <p style="color:#E8420A;font-size:15px;font-weight:700;">🧠 Rapport d'analyse</p>
 <p style="color:#a1a1aa;font-size:13px;">
-Un bouton <strong>« 🧠 Générer le rapport d'analyse »</strong> est disponible en haut de chaque
-plateforme. Il produit un rapport qui <strong>interprète</strong> les chiffres : ce qui a monté,
-ce qui a baissé, les causes probables, et des recommandations concrètes — puis se télécharge.
+Un bouton discret <strong>« 🧠 Générer le rapport d'analyse »</strong> se trouve tout en bas
+de chaque plateforme. Il produit un rapport qui <strong>interprète</strong> les chiffres : ce qui
+a monté, ce qui a baissé, les causes probables, et des recommandations concrètes — puis se télécharge.
 </p><br>
 <table class="kpi-table">
   <tr><th>Fonctionnalité</th><th>Description</th><th>Détail technique</th></tr>
-  <tr><td class="kpi-name">📍 Emplacement</td><td class="kpi-desc">Facebook et Instagram : au-dessus des onglets. Boost : onglet Global. Google Analytics : onglet Vue d'ensemble.</td><td><span class="endpoint">components/ai_insights.py</span></td></tr>
+  <tr><td class="kpi-name">📍 Emplacement</td><td class="kpi-desc">Tout en bas de chaque plateforme, sous les onglets — un bouton discret, visible quel que soit l'onglet ouvert.</td><td><span class="endpoint">components/ai_insights.py</span></td></tr>
   <tr><td class="kpi-name">📈 Comparaison de périodes</td><td class="kpi-desc">Chaque indicateur est accompagné de sa valeur sur la période précédente et de sa variation — c'est ce qui permet au rapport d'expliquer les hausses et les baisses plutôt que de répéter les chiffres.</td><td><span class="endpoint">ctx_*["_prev"]</span></td></tr>
   <tr><td class="kpi-name">🏆 Campagnes nommées</td><td class="kpi-desc">Sur le Boost, le rapport reçoit le top 3 des campagnes par dépense, les CTR les plus faibles (dépense ≥ 10 EUR uniquement, pour écarter le bruit) et la répartition par objectif.</td><td><span class="endpoint">ctx_boost["_notes"]</span></td></tr>
   <tr><td class="kpi-name">📱 Organique vs payant</td><td class="kpi-desc">La portée et les vues d'une page incluent le trafic publicitaire. Si l'onglet Boost a été chargé, l'évolution du budget est transmise au rapport, qui doit alors distinguer ce qui relève réellement de l'organique.</td><td><span class="endpoint">paid_spend_note()</span></td></tr>

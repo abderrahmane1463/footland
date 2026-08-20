@@ -596,12 +596,6 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
 
     with t1:
         _render_overview(ga4_data.get("overview", {}))
-        render_ai_report(
-            "Google Analytics — trafic du site footland.dz",
-            st.session_state.get("ctx_ga4"),
-            key="ga4",
-            kind="web",
-        )
         st.divider()
         _render_traffic_sources(ga4_data.get("traffic_sources", []))
 
@@ -617,3 +611,12 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
         _render_geography(ga4_data.get("geography", {}))
         st.divider()
         _render_devices(ga4_data.get("devices", []))
+
+
+    # Discreet entry point at the bottom of the page.
+    render_ai_report(
+        "Google Analytics — trafic du site footland.dz",
+        st.session_state.get("ctx_ga4"),
+        key="ga4",
+        kind="web",
+    )

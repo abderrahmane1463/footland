@@ -400,14 +400,6 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
         f"Followers: {total_fans}, Posts: {len(posts)}, Reach: {total_reach}"
     )
 
-    render_ai_report(
-        "Facebook — page Footland.dz (organique)",
-        st.session_state.get("ctx_facebook"),
-        key="facebook",
-        kind="social",
-        extra_notes=paid_spend_note(),
-    )
-
     # ── Tabs ─────────────────────────────────────────────────────────────────
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "👥Audience", "📡Visibility", "💬Engagement", "🏆Top Content", "🤝Community"
@@ -970,3 +962,11 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
         )
 
 
+    # Discreet entry point at the bottom of the page.
+    render_ai_report(
+        "Facebook — page Footland.dz (organique)",
+        st.session_state.get("ctx_facebook"),
+        key="facebook",
+        kind="social",
+        extra_notes=paid_spend_note(),
+    )
