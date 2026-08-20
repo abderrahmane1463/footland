@@ -24,7 +24,6 @@ app.py                    Streamlit entry point — routing, theming, prefetch t
   ├── components/
   │   ├── sidebar.py       Platform selector, date range picker, refresh button
   │   ├── chatbot.py        Floating AI assistant (Groq / GPT-OSS)
-  │   ├── ai_insights.py    Auto-generated KPI commentary shown in each view
   │   ├── charts.py         Shared Plotly chart helpers
   │   └── skeleton.py        Loading-state shimmer placeholders
   ├── views/
@@ -69,23 +68,12 @@ app.py                    Streamlit entry point — routing, theming, prefetch t
 - `fetcher.py` can be run on a schedule (see `.github/workflows/fetch.yml`) to
   pre-populate Supabase for every date-range preset.
 
-## AI features
+## AI Assistant
 
-Both features run on Groq (`openai/gpt-oss-120b`, falling back to
-`openai/gpt-oss-20b`) and require `GROQ_API_KEY`.
-
-- **On-demand commentary** (`components/ai_insights.py`) — a "Générer
-  l'analyse" button at the top of each platform view produces a short
-  "key takeaways + recommendations" block. The model is explicitly forbidden
-  from computing derived metrics: it may only restate values the dashboard
-  already calculated, which keeps invented arithmetic out of a client-facing
-  report. Results are cached on the KPI payload itself, so re-requesting the
-  same period is free; changing period resets the button so a stale analysis
-  never sits under new figures.
-- **Floating chatbot** (`components/chatbot.py`) — bottom-right, toggled from
-  the sidebar; answers questions about the data currently on screen.
-
-See the in-app **Documentation** tab for details.
+A floating chatbot (bottom-right, toggle via the sidebar "💬 Assistant IA"
+button) answers questions about the data currently shown on screen, using
+Groq (`openai/gpt-oss-120b`, falling back to `openai/gpt-oss-20b`).
+Requires `GROQ_API_KEY`. See the in-app **Documentation** tab for details.
 
 ## Logging
 

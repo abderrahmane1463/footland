@@ -21,7 +21,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from components.ai_insights import render_ai_insights
 from components.charts import get_chart_layout
 from api.boost import fetch_reach_for_ids
 
@@ -1329,11 +1328,6 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
 
     with t1:
         _render_global_kpis(totals, prev_totals)
-        render_ai_insights(
-            "Boost — campagnes publicitaires payantes Meta",
-            st.session_state.get("ctx_boost"),
-            key="boost",
-        )
         st.divider()
         _render_conversion_campaigns(conv, prev_conv)
 

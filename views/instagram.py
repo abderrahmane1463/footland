@@ -4,7 +4,6 @@ import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import db
-from components.ai_insights import render_ai_insights
 from components.charts import get_chart_layout, series_to_df, safe_sum
 from components.skeleton import skeleton_dashboard_html, skeleton_charts_html
 
@@ -275,12 +274,6 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     log_refresh_fn(
         "Instagram", period_label, "✅ Data Loaded",
         f"Followers: {followers}, Posts: {len(ig_posts)}, Reach: {total_ig_reach}"
-    )
-
-    render_ai_insights(
-        "Instagram — performance du compte (organique)",
-        st.session_state.get("ctx_instagram"),
-        key="instagram",
     )
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
