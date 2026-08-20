@@ -121,7 +121,7 @@ def render_documentation():
     with col4:
         st.info("📊 **Google Analytics** — Vue d'ensemble + Sources de trafic, E-commerce (Parcours d'achat + Top articles), Événements, Audience (Géographie + Appareils)")
     with col5:
-        st.info("🤖 **Intelligence Artificielle** — Rapport d'analyse sur chaque plateforme (interprétation des hausses/baisses + recommandations) et chatbot flottant (Groq / GPT-OSS)")
+        st.info("🤖 **Intelligence Artificielle** — Rapport d'analyse sur chaque plateforme (interprétation des hausses/baisses + recommandations) et chatbot flottant, tous deux propulsés par DeepSeek")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -495,11 +495,11 @@ ce qui a baissé, les causes probables, et des recommandations concrètes — pu
 </table>
 <br>
 <p style="color:#E8420A;font-size:15px;font-weight:700;">💬 Assistant conversationnel</p>
-<p style="color:#a1a1aa;font-size:14px;">Un assistant flottant, propulsé par <strong>Groq</strong> (modèles GPT-OSS 120B / 20B), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
+<p style="color:#a1a1aa;font-size:14px;">Un assistant flottant, propulsé par <strong>DeepSeek</strong> (avec Groq en secours), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
 <table class="kpi-table">
   <tr><th>Fonctionnalité</th><th>Description</th><th>Détail technique</th></tr>
   <tr><td class="kpi-name">💬 Ouverture / fermeture</td><td class="kpi-desc">Bouton "💬 Assistant IA" en bas de la barre latérale. Le bouton devient "✕ Fermer l'assistant" quand le panneau est ouvert.</td><td><span class="endpoint">st.session_state.chat_open</span></td></tr>
-  <tr><td class="kpi-name">🧠 Modèle IA</td><td class="kpi-desc">GPT-OSS 120B en priorité ; bascule automatiquement sur GPT-OSS 20B si la limite quotidienne du premier modèle est atteinte.</td><td><span class="endpoint">Groq API — chat.completions</span></td></tr>
+  <tr><td class="kpi-name">🧠 Modèle IA</td><td class="kpi-desc">DeepSeek (v4-flash) en priorité — réponse en 3 secondes environ. Bascule automatiquement sur Groq (GPT-OSS) si DeepSeek est indisponible ou si le crédit prépayé est épuisé.</td><td><span class="endpoint">components/llm.py</span></td></tr>
   <tr><td class="kpi-name">📊 Contexte des données</td><td class="kpi-desc">L'assistant connaît les KPIs de la période et de l'onglet actuellement affichés (Facebook, Instagram, Boost, Google Analytics) — uniquement les sections déjà visitées dans la session en cours.</td><td><span class="endpoint">ctx_facebook / ctx_instagram / ctx_boost / ctx_ga4</span></td></tr>
   <tr><td class="kpi-name">🌐 Langue</td><td class="kpi-desc">Répond en français, en s'appuyant sur les données réelles du dashboard ; indique clairement si une donnée n'est pas disponible plutôt que d'inventer un chiffre.</td><td><span class="endpoint">—</span></td></tr>
   <tr><td class="kpi-name">🗑️ Effacer la conversation</td><td class="kpi-desc">Bouton visible quand le panneau est ouvert et qu'il y a des messages — réinitialise l'historique de discussion.</td><td><span class="endpoint">st.session_state.chat_history</span></td></tr>
@@ -509,7 +509,7 @@ ce qui a baissé, les causes probables, et des recommandations concrètes — pu
 <table class="kpi-table">
   <tr><th>Situation</th><th>Comportement</th></tr>
   <tr><td class="kpi-name">Aucune donnée chargée</td><td class="kpi-desc">Si aucun onglet n'a encore été visité dans la session, l'assistant répond sans contexte chiffré et le signale.</td></tr>
-  <tr><td class="kpi-name">Limite quotidienne atteinte</td><td class="kpi-desc">Si les deux modèles Groq ont atteint leur quota gratuit, un message d'erreur invite à réessayer plus tard.</td></tr>
+  <tr><td class="kpi-name">Limite quotidienne atteinte</td><td class="kpi-desc">Si DeepSeek et Groq sont tous deux indisponibles (crédit épuisé ou quota gratuit atteint), un message invite à réessayer plus tard.</td></tr>
   <tr><td class="kpi-name">Clé API manquante</td><td class="kpi-desc">Si <code style="background:rgba(232,66,10,0.1);padding:1px 5px;border-radius:4px;">GROQ_API_KEY</code> n'est pas configurée (st.secrets ou .env), l'assistant affiche un message d'erreur explicite.</td></tr>
   <tr><td class="kpi-name">Hors-sujet</td><td class="kpi-desc">L'assistant est conçu pour répondre uniquement sur le contenu du dashboard Footland (KPIs, sources de données, méthodes de calcul).</td></tr>
 </table>""", unsafe_allow_html=True)

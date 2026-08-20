@@ -1,21 +1,17 @@
 """
-components/chatbot.py — AI Assistant (Groq) for the Footland Analytics dashboard.
+components/chatbot.py — AI Assistant for the Footland Analytics dashboard.
 
-Floating chat panel that can answer questions about the data currently
-displayed on screen (Facebook, Instagram, Boost, Google Analytics) using
-Groq's free hosted models.
+Floating chat panel that answers questions about the data currently displayed
+on screen (Facebook, Instagram, Boost, Google Analytics). Model calls go
+through components/llm.py: DeepSeek first, Groq as fallback.
 """
 
-import os
 import re
 
 import streamlit as st
 from dotenv import load_dotenv
 
-try:
-    from groq import Groq
-except ImportError:  # pragma: no cover - groq may not be installed yet
-    Groq = None
+from components.llm import any_provider_configured, complete, get_groq_key
 
 load_dotenv()
 
@@ -83,21 +79,9 @@ plutôt que d'inventer un chiffre. Tu peux aussi expliquer comment un KPI est ca
 ou d'où il provient (cf. limitations ci-dessus).
 """
 
-# Primary model, then a smaller/faster fallback used on rate limits.
-# The previous llama-3.x models were decommissioned by Groq (404 model_not_found).
-GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
-
-
-# ─── API key resolution ──────────────────────────────────────────────────────
-def _get_api_key():
-    """Read GROQ_API_KEY from st.secrets first, then environment variables."""
-    try:
-        key = st.secrets["GROQ_API_KEY"]
-        if key:
-            return key
-    except Exception:
-        pass
-    return os.environ.get("GROQ_API_KEY")
+# Provider selection, keys and fallback logic live in components/llm.py so the
+# chatbot and the analysis reports share one implementation.
+_get_api_key = get_groq_key
 
 
 # ─── Live data context ───────────────────────────────────────────────────────
@@ -149,46 +133,32 @@ def _build_data_context() -> str:
     )
 
 
-# ─── Groq chat completion ────────────────────────────────────────────────────
+# ─── Chat completion ─────────────────────────────────────────────────────────
 def _get_groq_response(history):
-    """Call Groq's chat completion API, falling back to a second model on rate limits."""
-    api_key = _get_api_key()
-    if not api_key:
-        return "⚠️ Clé API Groq introuvable. Configurez GROQ_API_KEY dans .env ou st.secrets."
-
-    if Groq is None:
-        return "⚠️ Le package 'groq' n'est pas installé. Ajoutez 'groq' à requirements.txt."
-
-    client = Groq(api_key=api_key)
+    """Answer one chat turn, via DeepSeek then Groq (see components/llm.py)."""
+    if not any_provider_configured():
+        return ("⚠️ Aucun fournisseur IA configuré. Renseignez DEEPSEEK_API_KEY "
+                "ou GROQ_API_KEY dans .env ou st.secrets.")
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT + _build_data_context()}]
     for msg in history:
         if msg.get("role") in ("user", "assistant"):
             messages.append({"role": msg["role"], "content": msg["content"]})
 
-    for model in GROQ_MODELS:
-        try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=1024,
-            )
-            content = (response.choices[0].message.content or "").strip()
-            # Reasoning models spend part of the budget thinking; if the whole
-            # budget went to reasoning, content comes back empty — fall through
-            # to the next model rather than showing an empty bubble.
-            if content:
-                return content
-            continue
-        except Exception as e:
-            err = str(e)
-            if "429" in err or "rate_limit" in err.lower():
-                continue
-            return f"⚠️ Erreur : {err}"
+    # These are reasoning models: part of the budget is spent thinking before
+    # any visible text appears, so a chat reply still needs real headroom —
+    # too small a ceiling returns an empty bubble rather than a short answer.
+    content = complete(
+        messages,
+        deepseek_max_tokens=3000,
+        groq_max_tokens=1024,
+        temperature=0.7,
+    )
+    if content:
+        return content
 
-    return ("⚠️ Aucune réponse n'a pu être générée (limite quotidienne atteinte "
-            "ou réponse vide). Réessayez dans quelques instants.")
+    return ("⚠️ Aucune réponse n'a pu être générée (limite du service IA ou "
+            "indisponibilité). Réessayez dans un instant.")
 
 
 # ─── Markdown → HTML helpers ─────────────────────────────────────────────────

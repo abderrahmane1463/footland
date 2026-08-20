@@ -23,7 +23,8 @@ See `.env.example` for the full list of environment variables required
 app.py                    Streamlit entry point — routing, theming, prefetch threads
   ├── components/
   │   ├── sidebar.py       Platform selector, date range picker, refresh button
-  │   ├── chatbot.py        Floating AI assistant (Groq / GPT-OSS)
+  │   ├── llm.py            Shared LLM layer (DeepSeek primary, Groq fallback)
+  │   ├── chatbot.py        Floating AI assistant
   │   ├── ai_insights.py    Per-platform AI analysis report (trends + reco)
   │   ├── charts.py         Shared Plotly chart helpers
   │   └── skeleton.py        Loading-state shimmer placeholders
@@ -71,9 +72,10 @@ app.py                    Streamlit entry point — routing, theming, prefetch t
 
 ## AI features
 
-The analysis reports run on **DeepSeek** (`deepseek-v4-flash`, `DEEPSEEK_API_KEY`)
-and fall back to **Groq** (`openai/gpt-oss-120b`, `GROQ_API_KEY`) if DeepSeek is
-unreachable or its prepaid balance runs out. The chatbot runs on Groq only.
+Both features go through `components/llm.py`: **DeepSeek** (`deepseek-v4-flash`,
+`DEEPSEEK_API_KEY`) with **Groq** (`openai/gpt-oss-120b`, `GROQ_API_KEY`) as the
+fallback when DeepSeek is unreachable or its prepaid balance runs out. One shared
+provider layer, because the quirks below are easy to get wrong twice.
 
 Two provider gotchas worth keeping:
 
@@ -103,7 +105,8 @@ often Streamlit reruns; changing period resets the button so a stale report
 never sits under new figures.
 
 **Floating chatbot** (`components/chatbot.py`) — bottom-right, toggled from the
-sidebar; answers questions about the data currently on screen.
+sidebar; answers questions about the data currently on screen (~3s per reply).
+It also sees previous-period values, so it can field trend questions too.
 
 See the in-app **Documentation** tab for details.
 
