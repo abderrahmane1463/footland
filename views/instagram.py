@@ -4,6 +4,7 @@ import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import db
+from components.ai_insights import render_ai_report, paid_spend_note
 from components.charts import get_chart_layout, series_to_df, safe_sum
 from components.skeleton import skeleton_dashboard_html, skeleton_charts_html
 
@@ -175,12 +176,15 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     _ig_eng_rate_display = "—" if _ig_reach_unavailable else f"{ig_eng_rate}%"
 
     # ── Context for AI chatbot ────────────────────────────────────────────────
+    # Raw numbers, not display strings: the AI report computes variations from
+    # these. None when genuinely unavailable, so consumers skip the metric
+    # instead of treating a formatted "—" as a value.
     st.session_state["ctx_instagram"] = {
         "period": period_label,
         "followers": followers,
         "posts_count": len(ig_posts),
-        "engagement_rate": _ig_eng_rate_display,
-        "reach": _ig_reach_display,
+        "engagement_rate": None if _ig_reach_unavailable else ig_eng_rate,
+        "reach": None if _ig_reach_unavailable else total_ig_reach,
         "views": total_ig_views,
         "saves": total_ig_saves,
         "total_interactions": total_ig_interactions,
@@ -274,6 +278,34 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     log_refresh_fn(
         "Instagram", period_label, "✅ Data Loaded",
         f"Followers: {followers}, Posts: {len(ig_posts)}, Reach: {total_ig_reach}"
+    )
+
+    # Previous period for the AI report. Engagement totals are summed from
+    # prev_ig_posts (fetched just above) using the same fields as the current
+    # period; followers and reach come from the profile call.
+    _p_likes  = sum(p.get("reactions", 0) for p in prev_ig_posts)
+    _p_comms  = sum(p.get("comments",  0) for p in prev_ig_posts)
+    _p_shares = sum(p.get("shares",    0) for p in prev_ig_posts)
+    _p_saves  = sum(p.get("saves",     0) for p in prev_ig_posts)
+    st.session_state["ctx_instagram"]["_prev"] = {
+        k: v for k, v in {
+            "followers":          _prev_followers,
+            "reach":              _prev_ig_reach,
+            "posts_count":        len(prev_ig_posts),
+            "likes":              _p_likes,
+            "comments":           _p_comms,
+            "shares":             _p_shares,
+            "saves":              _p_saves,
+            "total_interactions": _p_likes + _p_comms + _p_shares + _p_saves,
+        }.items() if v
+    }
+
+    render_ai_report(
+        "Instagram — compte footland.dz (organique)",
+        st.session_state.get("ctx_instagram"),
+        key="instagram",
+        kind="social",
+        extra_notes=paid_spend_note(),
     )
 
     # ── Tabs ──────────────────────────────────────────────────────────────────

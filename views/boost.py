@@ -21,6 +21,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from components.ai_insights import render_ai_report
 from components.charts import get_chart_layout
 from api.boost import fetch_reach_for_ids
 
@@ -1292,18 +1293,45 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
         if c.get("objective") in _CONV_OBJ and (c.get("spend", 0) > 0 or c.get("impressions", 0) > 0)
     )
 
-    # ── Context for AI chatbot ────────────────────────────────────────────────
-    st.session_state["ctx_boost"] = {
-        "period": f"{_period_since} → {_period_until}",
-        "campaigns_count": totals.get("campaigns_count", 0),
-        "link_clicks": totals.get("link_clicks", 0),
-        "reach": totals.get("reach", 0),
-        "impressions": totals.get("impressions", 0),
-        "cpc": totals.get("cpc", 0.0),
-        "ctr": totals.get("ctr", 0.0),
-        "spend": totals.get("spend", 0.0),
-        "frequency": totals.get("frequency", 0.0),
-    }
+    # ── Context for AI chatbot + analysis report ──────────────────────────────
+    # "_prev" carries the previous period under the same keys so the report can
+    # explain rises and falls; "_notes" carries the named movers, which is what
+    # lets the report point at concrete campaigns instead of only totals.
+    _ctx_keys = ("campaigns_count", "link_clicks", "reach", "impressions",
+                 "cpc", "ctr", "spend", "frequency")
+    _ctx_boost = {"period": f"{_period_since} → {_period_until}"}
+    _ctx_boost.update({k: totals.get(k, 0) for k in _ctx_keys})
+    _ctx_boost["_prev"] = {k: prev_totals.get(k, 0) for k in _ctx_keys if prev_totals.get(k)}
+
+    _notes = []
+    _spending = [c for c in campaigns if c.get("spend", 0) > 0]
+    if _spending:
+        _by_spend = sorted(_spending, key=lambda c: c.get("spend", 0), reverse=True)[:3]
+        _notes.append("Top campagnes par dépense : " + " | ".join(
+            f"{c.get('name', '—')[:55]} — {c.get('spend', 0):.2f} EUR, "
+            f"CTR {c.get('ctr', 0):.2f} %, objectif {c.get('objective', '—')}"
+            for c in _by_spend
+        ))
+        # Only rank CTR among campaigns with real budget: a 2 EUR campaign with
+        # a freak CTR is noise, not a finding.
+        _material = [c for c in _spending if c.get("spend", 0) >= 10]
+        if _material:
+            _worst = sorted(_material, key=lambda c: c.get("ctr", 0))[:3]
+            _notes.append("CTR les plus faibles (dépense ≥ 10 EUR) : " + " | ".join(
+                f"{c.get('name', '—')[:55]} — CTR {c.get('ctr', 0):.2f} %, "
+                f"{c.get('spend', 0):.2f} EUR, objectif {c.get('objective', '—')}"
+                for c in _worst
+            ))
+        _by_obj: dict[str, float] = {}
+        for c in _spending:
+            _by_obj[c.get("objective", "—")] = _by_obj.get(c.get("objective", "—"), 0.0) + c.get("spend", 0.0)
+        _notes.append("Dépense par objectif : " + " | ".join(
+            f"{o} {v:.2f} EUR" for o, v in sorted(_by_obj.items(), key=lambda x: -x[1])
+        ))
+    if _notes:
+        _ctx_boost["_notes"] = _notes
+
+    st.session_state["ctx_boost"] = _ctx_boost
 
     # Header
     _dark   = st.session_state.get("theme", "dark") == "dark"
@@ -1328,6 +1356,12 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
 
     with t1:
         _render_global_kpis(totals, prev_totals)
+        render_ai_report(
+            "Publicité Meta (Boost) — campagnes payantes Footland",
+            st.session_state.get("ctx_boost"),
+            key="boost",
+            kind="ads",
+        )
         st.divider()
         _render_conversion_campaigns(conv, prev_conv)
 

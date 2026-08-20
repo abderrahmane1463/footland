@@ -101,34 +101,44 @@ def _get_api_key():
 
 
 # ─── Live data context ───────────────────────────────────────────────────────
+def _ctx_rows(ctx: dict) -> str:
+    """Format one ctx_* dict as bullet lines.
+
+    Skips "period" (shown in the heading), keys starting with "_" (structural
+    data for the analysis report — previous-period values and notes, which
+    would otherwise dump raw dicts into the prompt) and unavailable metrics.
+    Previous-period values are appended inline so the assistant can answer
+    questions about rises and falls too.
+    """
+    prev = ctx.get("_prev") or {}
+    lines = []
+    for key, value in ctx.items():
+        if key == "period" or key.startswith("_") or value in (None, ""):
+            continue
+        row = f"- {key}: {value}"
+        if key in prev and prev[key] not in (None, ""):
+            row += f"  (période précédente : {prev[key]})"
+        lines.append(row)
+    return "\n".join(lines)
+
+
 def _build_data_context() -> str:
     """Build a text summary of the data currently shown on screen, from
     st.session_state context dicts (ctx_instagram, ctx_facebook, ctx_boost, ctx_ga4)."""
     sections = []
 
-    fb = st.session_state.get("ctx_facebook")
-    if fb:
-        period = fb.get("period", "")
-        rows = "\n".join(f"- {k}: {v}" for k, v in fb.items() if k != "period")
-        sections.append(f"### Facebook (période : {period})\n{rows}")
-
-    ig = st.session_state.get("ctx_instagram")
-    if ig:
-        period = ig.get("period", "")
-        rows = "\n".join(f"- {k}: {v}" for k, v in ig.items() if k != "period")
-        sections.append(f"### Instagram (période : {period})\n{rows}")
-
-    boost = st.session_state.get("ctx_boost")
-    if boost:
-        period = boost.get("period", "")
-        rows = "\n".join(f"- {k}: {v}" for k, v in boost.items() if k != "period")
-        sections.append(f"### Boost (période : {period})\n{rows}")
-
-    ga4 = st.session_state.get("ctx_ga4")
-    if ga4:
-        period = ga4.get("period", "")
-        rows = "\n".join(f"- {k}: {v}" for k, v in ga4.items() if k != "period")
-        sections.append(f"### Google Analytics (période : {period})\n{rows}")
+    for state_key, title in (
+        ("ctx_facebook",  "Facebook"),
+        ("ctx_instagram", "Instagram"),
+        ("ctx_boost",     "Boost"),
+        ("ctx_ga4",       "Google Analytics"),
+    ):
+        ctx = st.session_state.get(state_key)
+        if not ctx:
+            continue
+        rows = _ctx_rows(ctx)
+        if rows:
+            sections.append(f"### {title} (période : {ctx.get('period', '')})\n{rows}")
 
     if not sections:
         return ""

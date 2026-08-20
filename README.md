@@ -24,6 +24,7 @@ app.py                    Streamlit entry point — routing, theming, prefetch t
   ├── components/
   │   ├── sidebar.py       Platform selector, date range picker, refresh button
   │   ├── chatbot.py        Floating AI assistant (Groq / GPT-OSS)
+  │   ├── ai_insights.py    Per-platform AI analysis report (trends + reco)
   │   ├── charts.py         Shared Plotly chart helpers
   │   └── skeleton.py        Loading-state shimmer placeholders
   ├── views/
@@ -68,12 +69,34 @@ app.py                    Streamlit entry point — routing, theming, prefetch t
 - `fetcher.py` can be run on a schedule (see `.github/workflows/fetch.yml`) to
   pre-populate Supabase for every date-range preset.
 
-## AI Assistant
+## AI features
 
-A floating chatbot (bottom-right, toggle via the sidebar "💬 Assistant IA"
-button) answers questions about the data currently shown on screen, using
-Groq (`openai/gpt-oss-120b`, falling back to `openai/gpt-oss-20b`).
-Requires `GROQ_API_KEY`. See the in-app **Documentation** tab for details.
+Both run on Groq (`openai/gpt-oss-120b`, falling back to `openai/gpt-oss-20b`)
+and require `GROQ_API_KEY`.
+
+**Analysis report** (`components/ai_insights.py`) — a "Générer le rapport
+d'analyse" button on each platform produces a downloadable report that
+interprets the numbers: what rose, what fell, the likely causes, and
+recommendations. Three rules make it trustworthy:
+
+- *Python computes, the model interprets.* Every value and variation is
+  calculated in code; the model is forbidden from doing arithmetic. Left to
+  itself it invented "0,022 EUR par impression" — wrong by 100x.
+- *Deltas are the point.* Each `ctx_*` payload carries `_prev` (previous-period
+  values under the same keys). Without them the model can only restate the KPI
+  cards; with them it can explain a movement.
+- *Paid traffic is disclosed.* Page reach and views include ads, so when the
+  Boost tab has loaded, the ad-spend trend is passed along and the report must
+  separate genuine organic performance from budget-driven lift.
+
+Generation is cached on the KPI payload, so a period costs one API call however
+often Streamlit reruns; changing period resets the button so a stale report
+never sits under new figures.
+
+**Floating chatbot** (`components/chatbot.py`) — bottom-right, toggled from the
+sidebar; answers questions about the data currently on screen.
+
+See the in-app **Documentation** tab for details.
 
 ## Logging
 

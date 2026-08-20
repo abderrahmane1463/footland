@@ -6,6 +6,7 @@ import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import db
+from components.ai_insights import render_ai_report, paid_spend_note
 from components.charts import get_chart_layout, series_to_df, safe_sum, render_top3_podium
 from components.skeleton import skeleton_dashboard_html, skeleton_charts_html
 
@@ -271,14 +272,17 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
     )
     _eng_rate_display = "—" if _reach_unavailable else f"{eng_rate}%"
 
-    # ── Context for AI chatbot ────────────────────────────────────────────────
+    # ── Context for AI chatbot + analysis report ──────────────────────────────
+    # Raw numbers, not the display strings: the report computes variations from
+    # these. None when a metric is genuinely unavailable — consumers skip it
+    # rather than reporting a formatted "—" as if it were a value.
     st.session_state["ctx_facebook"] = {
         "period": period_label,
         "followers": total_fans,
         "new_followers": total_adds,
         "unfollows": total_removes,
-        "engagement_rate": _eng_rate_display,
-        "reach": _reach_display,
+        "engagement_rate": None if _reach_unavailable else eng_rate,
+        "reach": None if _reach_unavailable else total_reach,
         "impressions": total_impressions,
         "content_interactions": total_content_interactions,
         "posts_count": len(posts),
@@ -304,6 +308,25 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
     _prev_shars   = prev_post_totals.get("total_shares",    0)
     _prev_engs    = prev_post_totals.get("total_interactions", _prev_reacs + _prev_comms + _prev_shars)
     _prev_posts   = prev_post_totals.get("total_posts", 0)
+    _prev_reach   = prev_vis.get("period_reach", 0) or safe_sum(prev_vis.get("reach", []))
+
+    # Previous period for the AI report — same keys as the context above, so it
+    # can explain what rose and what fell. Set here because these values are
+    # only computed after the context dict is built.
+    st.session_state["ctx_facebook"]["_prev"] = {
+        k: v for k, v in {
+            "followers":          _prev_fans,
+            "new_followers":      _prev_adds,
+            "unfollows":          _prev_removes,
+            "reach":              _prev_reach,
+            "impressions":        _prev_impr,
+            "posts_count":        _prev_posts,
+            "total_interactions": _prev_engs,
+            "reactions":          _prev_reacs,
+            "comments":           _prev_comms,
+            "shares":             _prev_shars,
+        }.items() if v
+    }
 
     _dark = st.session_state.get("theme", "dark") == "dark"
     def _kpi(icon, label, value, color=None, note=None, delta=None):
@@ -375,6 +398,14 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
         period_label,
         "✅ Data Loaded",
         f"Followers: {total_fans}, Posts: {len(posts)}, Reach: {total_reach}"
+    )
+
+    render_ai_report(
+        "Facebook — page Footland.dz (organique)",
+        st.session_state.get("ctx_facebook"),
+        key="facebook",
+        kind="social",
+        extra_notes=paid_spend_note(),
     )
 
     # ── Tabs ─────────────────────────────────────────────────────────────────

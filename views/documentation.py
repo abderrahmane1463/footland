@@ -121,7 +121,7 @@ def render_documentation():
     with col4:
         st.info("📊 **Google Analytics** — Vue d'ensemble + Sources de trafic, E-commerce (Parcours d'achat + Top articles), Événements, Audience (Géographie + Appareils)")
     with col5:
-        st.info("🤖 **Assistant IA** — Chatbot flottant (Groq / GPT-OSS) répondant aux questions sur les données affichées dans le dashboard")
+        st.info("🤖 **Intelligence Artificielle** — Rapport d'analyse sur chaque plateforme (interprétation des hausses/baisses + recommandations) et chatbot flottant (Groq / GPT-OSS)")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -470,11 +470,31 @@ Affiché immédiatement après le tableau Sales, avec son propre filtre et son p
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Assistant IA ──────────────────────────────────────────────────────────
-    st.markdown('<div class="doc-section-title">🤖 Assistant IA</div>', unsafe_allow_html=True)
+    # ── Intelligence Artificielle ─────────────────────────────────────────────
+    st.markdown('<div class="doc-section-title">🤖 Intelligence Artificielle</div>', unsafe_allow_html=True)
 
     st.markdown("""
-<p style="color:#a1a1aa;font-size:14px;">Un assistant conversationnel flottant, propulsé par <strong>Groq</strong> (modèles GPT-OSS 120B / 20B), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
+<p style="color:#E8420A;font-size:15px;font-weight:700;">🧠 Rapport d'analyse</p>
+<p style="color:#a1a1aa;font-size:13px;">
+Un bouton <strong>« 🧠 Générer le rapport d'analyse »</strong> est disponible en haut de chaque
+plateforme. Il produit un rapport qui <strong>interprète</strong> les chiffres : ce qui a monté,
+ce qui a baissé, les causes probables, et des recommandations concrètes — puis se télécharge.
+</p><br>
+<table class="kpi-table">
+  <tr><th>Fonctionnalité</th><th>Description</th><th>Détail technique</th></tr>
+  <tr><td class="kpi-name">📍 Emplacement</td><td class="kpi-desc">Facebook et Instagram : au-dessus des onglets. Boost : onglet Global. Google Analytics : onglet Vue d'ensemble.</td><td><span class="endpoint">components/ai_insights.py</span></td></tr>
+  <tr><td class="kpi-name">📈 Comparaison de périodes</td><td class="kpi-desc">Chaque indicateur est accompagné de sa valeur sur la période précédente et de sa variation — c'est ce qui permet au rapport d'expliquer les hausses et les baisses plutôt que de répéter les chiffres.</td><td><span class="endpoint">ctx_*["_prev"]</span></td></tr>
+  <tr><td class="kpi-name">🏆 Campagnes nommées</td><td class="kpi-desc">Sur le Boost, le rapport reçoit le top 3 des campagnes par dépense, les CTR les plus faibles (dépense ≥ 10 EUR uniquement, pour écarter le bruit) et la répartition par objectif.</td><td><span class="endpoint">ctx_boost["_notes"]</span></td></tr>
+  <tr><td class="kpi-name">📱 Organique vs payant</td><td class="kpi-desc">La portée et les vues d'une page incluent le trafic publicitaire. Si l'onglet Boost a été chargé, l'évolution du budget est transmise au rapport, qui doit alors distinguer ce qui relève réellement de l'organique.</td><td><span class="endpoint">paid_spend_note()</span></td></tr>
+  <tr><td class="kpi-name">🔒 Fiabilité des chiffres</td><td class="kpi-desc">Toutes les valeurs et variations sont calculées en Python. Le modèle a interdiction formelle de calculer quoi que ce soit : il ne fait qu'interpréter. Il lui est aussi interdit de comparer le CTR entre objectifs différents (une campagne notoriété n'optimise pas le clic).</td><td><span class="endpoint">SYSTEM_PROMPT</span></td></tr>
+  <tr><td class="kpi-name">🔄 Changement de période</td><td class="kpi-desc">Si la période change, le rapport affiché disparaît et le bouton réapparaît — cela évite de laisser une analyse obsolète sous de nouveaux chiffres.</td><td><span class="endpoint">—</span></td></tr>
+  <tr><td class="kpi-name">⚡ Coût & rapidité</td><td class="kpi-desc">Rien n'est généré tant que le bouton n'est pas cliqué. Le résultat est mis en cache sur les données : redemander la même période est instantané et gratuit.</td><td><span class="endpoint">st.cache_data(ttl=3600)</span></td></tr>
+  <tr><td class="kpi-name">📥 Téléchargement</td><td class="kpi-desc">Le rapport peut être télécharger au format Markdown pour être intégré à un livrable client.</td><td><span class="endpoint">—</span></td></tr>
+  <tr><td class="kpi-name">🛡️ Tolérance aux pannes</td><td class="kpi-desc">En cas de limite du service IA, un message discret s'affiche et le bouton reste utilisable — le dashboard n'est jamais bloqué.</td><td><span class="endpoint">—</span></td></tr>
+</table>
+<br>
+<p style="color:#E8420A;font-size:15px;font-weight:700;">💬 Assistant conversationnel</p>
+<p style="color:#a1a1aa;font-size:14px;">Un assistant flottant, propulsé par <strong>Groq</strong> (modèles GPT-OSS 120B / 20B), capable de répondre aux questions sur les statistiques affichées dans le dashboard.</p><br>
 <table class="kpi-table">
   <tr><th>Fonctionnalité</th><th>Description</th><th>Détail technique</th></tr>
   <tr><td class="kpi-name">💬 Ouverture / fermeture</td><td class="kpi-desc">Bouton "💬 Assistant IA" en bas de la barre latérale. Le bouton devient "✕ Fermer l'assistant" quand le panneau est ouvert.</td><td><span class="endpoint">st.session_state.chat_open</span></td></tr>

@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from components.ai_insights import render_ai_report
 from components.charts import get_chart_layout
 
 
@@ -531,13 +532,60 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
 
     # ── Context for AI chatbot ────────────────────────────────────────────────
     _ov = ga4_data.get("overview", {})
-    st.session_state["ctx_ga4"] = {
+    _ctx_ga4 = {
         "period": f"{since} → {until}",
         "active_users": _ov.get("active_users", 0),
         "new_users": _ov.get("new_users", 0),
         "sessions": _ov.get("sessions", 0),
         "engaged_sessions": _ov.get("engaged_sessions", 0),
+        "engagement_rate": _ov.get("engagement_rate", 0.0),
+        "bounce_rate": _ov.get("bounce_rate", 0.0),
     }
+
+    # Previous period, for the AI report's rise/fall analysis. GA4 is the only
+    # source with no comparison already in scope, so fetch just the overview
+    # block (cached) rather than the full eight-section payload.
+    if since and until:
+        try:
+            from datetime import date, timedelta
+
+            from api.ga4 import fetch_ga4_overview
+
+            _s, _u = date.fromisoformat(since), date.fromisoformat(until)
+            _span = (_u - _s).days + 1
+            _prev_u = _s - timedelta(days=1)
+            _prev_s = _prev_u - timedelta(days=_span - 1)
+
+            @st.cache_data(ttl=3600, show_spinner=False)
+            def _ga4_prev_overview(a: str, b: str) -> dict:
+                return fetch_ga4_overview(a, b)
+
+            _prev_ov = _ga4_prev_overview(str(_prev_s), str(_prev_u))
+            if _prev_ov:
+                _ctx_ga4["_prev"] = {
+                    k: v for k, v in {
+                        "active_users":     _prev_ov.get("active_users", 0),
+                        "new_users":        _prev_ov.get("new_users", 0),
+                        "sessions":         _prev_ov.get("sessions", 0),
+                        "engaged_sessions": _prev_ov.get("engaged_sessions", 0),
+                        "engagement_rate":  _prev_ov.get("engagement_rate", 0.0),
+                        "bounce_rate":      _prev_ov.get("bounce_rate", 0.0),
+                    }.items() if v
+                }
+                _ctx_ga4["period"] += f"  (comparé à {_prev_s} → {_prev_u})"
+        except Exception as _e:  # noqa: BLE001 - comparison is optional
+            print(f"DEBUG ga4 prev overview: {_e}")
+
+    # Channel split is the single most telling figure on this tab — it shows how
+    # much of the traffic is actually bought.
+    _srcs = ga4_data.get("traffic_sources", []) or []
+    if _srcs:
+        _ctx_ga4["_notes"] = ["Répartition du trafic par canal (sessions) : " + " | ".join(
+            f"{s.get('channel', '—')} {s.get('sessions', 0)}"
+            for s in sorted(_srcs, key=lambda s: -s.get("sessions", 0))[:6]
+        )]
+
+    st.session_state["ctx_ga4"] = _ctx_ga4
 
     t1, t2, t3, t4 = st.tabs([
         "📊 Vue d'ensemble",
@@ -548,6 +596,12 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
 
     with t1:
         _render_overview(ga4_data.get("overview", {}))
+        render_ai_report(
+            "Google Analytics — trafic du site footland.dz",
+            st.session_state.get("ctx_ga4"),
+            key="ga4",
+            kind="web",
+        )
         st.divider()
         _render_traffic_sources(ga4_data.get("traffic_sources", []))
 

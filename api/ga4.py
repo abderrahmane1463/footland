@@ -386,3 +386,20 @@ def fetch_all_ga4_data(start: str, end: str) -> dict:
             print(f"GA4 {key} error: {e}")
 
     return result
+
+
+def fetch_ga4_overview(start: str, end: str) -> dict:
+    """
+    Fetch only the overview block for one date range.
+
+    Used to pull the previous period for the AI analysis report without paying
+    for the eight other sections of fetch_all_ga4_data(). Returns {} on failure
+    so a missing comparison degrades the report rather than breaking the tab.
+    """
+    try:
+        creds  = _get_credentials()
+        client = BetaAnalyticsDataClient(credentials=creds)
+        return _fetch_overview(client, start, end)
+    except Exception as e:
+        print(f"GA4 overview ({start}->{end}) error: {e}")
+        return {}
