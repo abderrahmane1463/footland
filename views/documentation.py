@@ -490,7 +490,8 @@ ce qui a baissé, les causes probables, et des recommandations concrètes — pu
   <tr><td class="kpi-name">🔄 Changement de période</td><td class="kpi-desc">Si la période change, le rapport affiché disparaît et le bouton réapparaît — cela évite de laisser une analyse obsolète sous de nouveaux chiffres.</td><td><span class="endpoint">—</span></td></tr>
   <tr><td class="kpi-name">⚡ Coût & rapidité</td><td class="kpi-desc">Rien n'est généré tant que le bouton n'est pas cliqué. Le résultat est mis en cache sur les données : redemander la même période est instantané et gratuit.</td><td><span class="endpoint">st.cache_data(ttl=3600)</span></td></tr>
   <tr><td class="kpi-name">📥 Téléchargement</td><td class="kpi-desc">Le rapport peut être télécharger au format Markdown pour être intégré à un livrable client.</td><td><span class="endpoint">—</span></td></tr>
-  <tr><td class="kpi-name">🛡️ Tolérance aux pannes</td><td class="kpi-desc">En cas de limite du service IA, un message discret s'affiche et le bouton reste utilisable — le dashboard n'est jamais bloqué.</td><td><span class="endpoint">—</span></td></tr>
+  <tr><td class="kpi-name">🧠 Modèle utilisé</td><td class="kpi-desc">DeepSeek (v4-flash) en priorité — il produit l'analyse la plus fine. Bascule automatiquement sur Groq (GPT-OSS 120B) si DeepSeek est indisponible ou si le crédit prépayé est épuisé.</td><td><span class="endpoint">DEEPSEEK_API_KEY → GROQ_API_KEY</span></td></tr>
+  <tr><td class="kpi-name">🛡️ Tolérance aux pannes</td><td class="kpi-desc">Double fournisseur : si le premier échoue, le second prend le relais. Si les deux échouent, un message discret s'affiche et le bouton reste utilisable — le dashboard n'est jamais bloqué.</td><td><span class="endpoint">—</span></td></tr>
 </table>
 <br>
 <p style="color:#E8420A;font-size:15px;font-weight:700;">💬 Assistant conversationnel</p>

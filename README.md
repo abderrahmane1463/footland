@@ -71,8 +71,17 @@ app.py                    Streamlit entry point — routing, theming, prefetch t
 
 ## AI features
 
-Both run on Groq (`openai/gpt-oss-120b`, falling back to `openai/gpt-oss-20b`)
-and require `GROQ_API_KEY`.
+The analysis reports run on **DeepSeek** (`deepseek-v4-flash`, `DEEPSEEK_API_KEY`)
+and fall back to **Groq** (`openai/gpt-oss-120b`, `GROQ_API_KEY`) if DeepSeek is
+unreachable or its prepaid balance runs out. The chatbot runs on Groq only.
+
+Two provider gotchas worth keeping:
+
+- **`deepseek-v4-flash`, not `v4-pro`.** Pro spends its budget reasoning —
+  4 773 reasoning tokens for *less* output than flash — takes over two minutes,
+  and returns a completely empty message at `max_tokens=3000`.
+- **Token budgets differ per provider.** DeepSeek needs 8 000 (flash used 3 153
+  on one report); Groq rejects that ceiling with HTTP 413 and keeps 3 000.
 
 **Analysis report** (`components/ai_insights.py`) — a "Générer le rapport
 d'analyse" button on each platform produces a downloadable report that

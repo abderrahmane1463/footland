@@ -16,8 +16,10 @@ Design rules learned the hard way:
    budget increase to organic performance.
 """
 
+import os
 import time
 
+import requests
 import streamlit as st
 
 from components.chatbot import GROQ_MODELS, _get_api_key, _md_to_html
@@ -26,6 +28,40 @@ try:
     from groq import Groq
 except ImportError:  # pragma: no cover - groq may not be installed yet
     Groq = None
+
+
+# ─── Model providers ──────────────────────────────────────────────────────────
+# DeepSeek is the primary: on the same payload it produced a visibly sharper
+# report than gpt-oss (it read the CTR drop as a frequency effect rather than
+# creative fatigue, and warned against judging awareness campaigns on CTR).
+# Groq stays as the fallback so reports still generate if DeepSeek is down or
+# the prepaid balance runs out.
+#
+# v4-flash, not v4-pro: pro spends its budget reasoning (4 773 reasoning tokens
+# for LESS output than flash), takes over two minutes, and returned a
+# completely empty message at max_tokens=3000.
+DEEPSEEK_MODEL = "deepseek-v4-flash"
+DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+
+# Token budgets are per provider and deliberately different.
+# DeepSeek needs headroom: flash spent 3 153 completion tokens on a Boost
+# report, so a 3 000 ceiling truncated it mid-sentence.
+# Groq rejects that same ceiling outright (HTTP 413 Payload Too Large), and
+# gpt-oss only used 1 247 tokens for a full report anyway — so it keeps 3 000.
+DEEPSEEK_MAX_TOKENS = 8000
+GROQ_MAX_TOKENS = 3000
+REQUEST_TIMEOUT = 180
+
+
+def _get_deepseek_key() -> str | None:
+    """Read DEEPSEEK_API_KEY from st.secrets first, then the environment."""
+    try:
+        key = st.secrets["DEEPSEEK_API_KEY"]
+        if key:
+            return key
+    except Exception:  # noqa: BLE001 - secrets file may not exist at all
+        pass
+    return os.environ.get("DEEPSEEK_API_KEY")
 
 
 # Keys carrying structure rather than a KPI value.
@@ -220,44 +256,90 @@ class _ReportError(RuntimeError):
     """
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _generate(section_label: str, payload: str, kind: str) -> str:
-    """Generate one report. Cached on (section, payload, kind) — the payload
-    holds every value and variation, so the key changes exactly when data does."""
+def _try_deepseek(system: str, user: str) -> str:
+    """Primary provider. Returns "" if unavailable so the caller falls back."""
+    key = _get_deepseek_key()
+    if not key:
+        return ""
+
+    for attempt in range(2):
+        try:
+            resp = requests.post(
+                DEEPSEEK_URL,
+                headers={"Authorization": f"Bearer {key}",
+                         "Content-Type": "application/json"},
+                json={
+                    "model": DEEPSEEK_MODEL,
+                    "messages": [{"role": "system", "content": system},
+                                 {"role": "user", "content": user}],
+                    "temperature": 0.4,
+                    "max_tokens": DEEPSEEK_MAX_TOKENS,
+                },
+                timeout=REQUEST_TIMEOUT,
+            )
+            if resp.status_code == 429:
+                time.sleep(3 * (attempt + 1))
+                continue
+            if resp.status_code == 402:
+                # Prepaid balance exhausted — no point retrying, fall back.
+                print("DEBUG ai_insights: DeepSeek balance exhausted")
+                return ""
+            resp.raise_for_status()
+            return (resp.json()["choices"][0]["message"]["content"] or "").strip()
+        except Exception as exc:  # noqa: BLE001
+            print(f"DEBUG ai_insights: DeepSeek failed: {exc}")
+            return ""
+    return ""
+
+
+def _try_groq(system: str, user: str) -> str:
+    """Fallback provider. Returns "" if unavailable."""
     api_key = _get_api_key()
     if not api_key or Groq is None:
-        raise _ReportError("Groq unavailable")
+        return ""
 
     client = Groq(api_key=api_key)
-    system = f"{_COMMON_RULES}\n\n{_STRUCTURES.get(kind, _STRUCTURES['social'])}"
-    user = f"PLATEFORME / SECTION : {section_label}\n\nINDICATEURS :\n{payload}"
-
     for model in GROQ_MODELS:
-        # Generating several reports in a row hits the free-tier rate limit,
-        # so back off and retry before falling through to the smaller model.
+        # Several reports in a row hit the free-tier rate limit, so back off
+        # before falling through to the smaller model.
         for attempt in range(3):
             try:
                 response = client.chat.completions.create(
                     model=model,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
+                    messages=[{"role": "system", "content": system},
+                              {"role": "user", "content": user}],
                     temperature=0.4,
-                    max_tokens=3000,
+                    max_tokens=GROQ_MAX_TOKENS,
                 )
                 content = (response.choices[0].message.content or "").strip()
                 if content:
                     return content
-                break  # empty reply ⇒ try the next model, not the same one again
+                break  # empty reply ⇒ next model, not the same one again
             except Exception as exc:  # noqa: BLE001
                 if "429" in str(exc) or "rate_limit" in str(exc).lower():
                     time.sleep(3 * (attempt + 1))
                     continue
-                print(f"DEBUG ai_insights: {model} failed: {exc}")
+                print(f"DEBUG ai_insights: Groq {model} failed: {exc}")
                 break
+    return ""
 
-    raise _ReportError("no model returned a report")
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _generate(section_label: str, payload: str, kind: str) -> str:
+    """Generate one report, DeepSeek first then Groq.
+
+    Cached on (section, payload, kind) — the payload holds every value and
+    variation, so the key changes exactly when the data does.
+    """
+    system = f"{_COMMON_RULES}\n\n{_STRUCTURES.get(kind, _STRUCTURES['social'])}"
+    user = f"PLATEFORME / SECTION : {section_label}\n\nINDICATEURS :\n{payload}"
+
+    for provider in (_try_deepseek, _try_groq):
+        content = provider(system, user)
+        if content:
+            return content
+
+    raise _ReportError("no provider returned a report")
 
 
 # ─── Rendering ────────────────────────────────────────────────────────────────
