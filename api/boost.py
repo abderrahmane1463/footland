@@ -109,6 +109,28 @@ def _derive_delivery_status(effective_status: str, stop_time: str) -> str:
     }.get(es, es.lower() or "—")
 
 
+# Meta's app-level throttle. Backoff is deliberately steeper than the generic
+# one: once the app limit is hit, retrying quickly just deepens the hole.
+RATE_LIMIT_BACKOFF = 4.0
+_RATE_LIMIT_CODES = {4, 17, 32, 613}  # app / user / page request limits
+
+
+def _is_rate_limited(resp) -> bool:
+    """True when Meta is throttling us.
+
+    Meta returns its rate limits as HTTP 403 with an error code (4 =
+    "Application request limit reached"), not as 429, so status alone is not
+    enough to tell throttling apart from a genuine permission error.
+    """
+    if resp.status_code not in (400, 403, 429):
+        return False
+    try:
+        err = resp.json().get("error", {})
+    except Exception:  # noqa: BLE001 - non-JSON error body
+        return False
+    return err.get("code") in _RATE_LIMIT_CODES or bool(err.get("is_transient"))
+
+
 # ─── Internal HTTP layer (no block-guard) ─────────────────────────────────────
 def _get_ads(endpoint: str, params: dict) -> dict:
     """
@@ -123,11 +145,25 @@ def _get_ads(endpoint: str, params: dict) -> dict:
             resp = requests.get(url, params=full_params, timeout=REQUEST_TIMEOUT)
             if resp.status_code not in (200, 400):
                 print(f"DEBUG ads: HTTP {resp.status_code} on {endpoint}: {resp.text[:200]}")
-            if resp.status_code == 429:
-                time.sleep(RETRY_BACKOFF ** attempt)
-                continue
+
+            # Meta signals its app-level rate limit as 403 with code 4
+            # ("Application request limit reached", is_transient), not 429.
+            # Without this it was treated as a hard failure and never retried.
+            if resp.status_code == 429 or _is_rate_limited(resp):
+                if attempt < MAX_RETRIES:
+                    time.sleep(RATE_LIMIT_BACKOFF ** attempt)
+                    continue
+
+            # 4xx other than rate limiting is deterministic — a malformed or
+            # over-long request fails identically on every attempt, so retrying
+            # only wastes round-trips (and burns more rate-limit budget).
+            if 400 <= resp.status_code < 500 and not _is_rate_limited(resp):
+                resp.raise_for_status()
+
             resp.raise_for_status()
             return resp.json()
+        except requests.exceptions.HTTPError:
+            raise
         except requests.exceptions.RequestException as exc:
             print(f"DEBUG ads: request failed (attempt {attempt}): {exc}")
             if attempt == MAX_RETRIES:
@@ -253,8 +289,21 @@ def _safe_int(val, default=0) -> int:
 
 
 # ─── Shared helpers ───────────────────────────────────────────────────────────
-def _get_footland_ids() -> list:
-    """Fetch all Footland campaign IDs from the ad account (all pages)."""
+# The campaign list is the same for every fetch on a page load, but each caller
+# used to re-request it — 16 times in one observed session. Since pagination was
+# added, each of those walks all ~2 100 campaigns (~5 requests), so the list
+# alone cost ~80 calls per load and was the main reason Meta started returning
+# "Application request limit reached". It changes slowly, so cache it.
+_IDS_CACHE_TTL = 900  # seconds
+_ids_cache: dict[str, tuple[float, list]] = {}
+
+
+def _get_footland_ids(force: bool = False) -> list:
+    """All Footland campaign IDs in the ad account, cached for _IDS_CACHE_TTL."""
+    cached = _ids_cache.get("ids")
+    if cached and not force and (time.time() - cached[0]) < _IDS_CACHE_TTL:
+        return cached[1]
+
     try:
         all_camps = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/campaigns", {
             "fields": "id,name",
@@ -262,10 +311,91 @@ def _get_footland_ids() -> list:
         })
         ids = [c["id"] for c in all_camps if any(kw in c.get("name", "") for kw in FOOTLAND_CAMPAIGN_KEYWORDS)]
         print(f"DEBUG boost: {len(ids)} Footland campaign IDs found (out of {len(all_camps)} total in account)")
+        if ids:
+            _ids_cache["ids"] = (time.time(), ids)
         return ids
     except Exception as e:
         print(f"DEBUG boost: _get_footland_ids error: {e}")
+        # Serve a stale list rather than nothing — an empty list makes every
+        # downstream call return no data at all.
+        return cached[1] if cached else []
+
+
+def _is_footland(name: str) -> bool:
+    return any(kw in (name or "") for kw in FOOTLAND_CAMPAIGN_KEYWORDS)
+
+
+def _active_footland_ids(time_range: str) -> list:
+    """Footland campaign IDs that actually ran during the period.
+
+    A single UNFILTERED campaign-level insights call returns only campaigns
+    with delivery in the window — account-wide, but that is a few hundred rows,
+    one page — and the Footland ones are picked out by name in Python.
+
+    This exists because filtering by the ~1 100 lifetime campaign IDs meant
+    either a 32 KB URL (rejected outright) or eight batched requests per call
+    site, which tripped Meta's app-level request limit. Asking about the ~60
+    campaigns that actually ran costs one request and one batch downstream.
+
+    Memoised per period — several call sites need the same list.
+    """
+    cache_key = f"active_ids::{time_range}"
+    cached = _ids_cache.get(cache_key)
+    if cached and (time.time() - cached[0]) < _IDS_CACHE_TTL:
+        return cached[1]
+
+    try:
+        rows = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/insights", {
+            "level":      "campaign",
+            "fields":     "campaign_id,campaign_name",
+            "time_range": time_range,
+            "limit":      500,
+        })
+        ids = [r.get("campaign_id") for r in rows
+               if r.get("campaign_id") and _is_footland(r.get("campaign_name"))]
+        print(f"DEBUG boost: {len(ids)} Footland campaigns active in period "
+              f"(of {len(rows)} account-wide)")
+        if ids:
+            _ids_cache[cache_key] = (time.time(), ids)
+        return ids
+    except Exception as e:
+        print(f"DEBUG boost: _active_footland_ids error: {e}")
         return []
+
+
+# Meta rejects very long URLs (the 1 133-ID filter produced a 32 KB URL and a
+# flat 400), so ID filters are sent in batches and the rows concatenated.
+_FILTER_CHUNK = 150
+
+
+def _cached_account_fetch(cache_key: str, endpoint: str, params: dict) -> list:
+    """Paginated fetch of account-wide metadata, memoised for _IDS_CACHE_TTL.
+
+    These calls carry no time_range, so they return the same rows for the
+    current period and the previous-period comparison — fetching them twice per
+    page load was pure waste against Meta's request budget.
+    """
+    cached = _ids_cache.get(cache_key)
+    if cached and (time.time() - cached[0]) < _IDS_CACHE_TTL:
+        return cached[1]
+    rows = _get_ads_all_pages(endpoint, params)
+    if rows:
+        _ids_cache[cache_key] = (time.time(), rows)
+    return rows
+
+
+def _get_ads_filtered(endpoint: str, params: dict, field: str, ids: list) -> list:
+    """Paginated GET filtered by a list of IDs, sent in URL-safe batches."""
+    if not ids:
+        return []
+    rows: list = []
+    for i in range(0, len(ids), _FILTER_CHUNK):
+        batch = ids[i:i + _FILTER_CHUNK]
+        rows.extend(_get_ads_all_pages(endpoint, {
+            **params,
+            "filtering": json.dumps([{"field": field, "operator": "IN", "value": batch}]),
+        }))
+    return rows
 
 
 # ─── Public fetch function ────────────────────────────────────────────────────
@@ -336,10 +466,11 @@ def fetch_boost_insights(
     # Fetch delivery status and budget per campaign
     _camp_meta: dict[str, dict] = {}
     try:
-        camps_meta_data = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/campaigns", {
-            "fields": "id,effective_status,daily_budget,lifetime_budget,stop_time",
-            "limit":  500,
-        })
+        camps_meta_data = _cached_account_fetch(
+            "camp_meta", f"{AD_ACCOUNT_ID}/campaigns",
+            {"fields": "id,effective_status,daily_budget,lifetime_budget,stop_time",
+             "limit": 500},
+        )
         for c in camps_meta_data:
             cid = c.get("id", "")
             daily    = _safe_float(c.get("daily_budget",    0)) / 100
@@ -361,10 +492,14 @@ def fetch_boost_insights(
     # derives the Results column from this, not from the campaign objective.
     _camp_optim: dict[str, str] = {}
     try:
-        adsets_optim_data = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/adsets", {
-            "fields": "campaign_id,optimization_goal",
-            "limit":  500,
-        })
+        # Unfiltered this walks every adset in a 2 100-campaign account — the
+        # single largest source of requests here. Restricted to the campaigns
+        # that ran in the period, it is one batch.
+        adsets_optim_data = _get_ads_filtered(
+            f"{AD_ACCOUNT_ID}/adsets",
+            {"fields": "campaign_id,optimization_goal", "limit": 500},
+            "campaign.id", _active_footland_ids(time_range),
+        )
         for a in adsets_optim_data:
             cid = a.get("campaign_id", "")
             goal = a.get("optimization_goal", "")
@@ -376,37 +511,28 @@ def fetch_boost_insights(
     if not footland_ids:
         return out
 
-    _FILTERING = json.dumps([{
-        "field":    "campaign.id",
-        "operator": "IN",
-        "value":    footland_ids,
-    }])
+    # NOTE: account-level deduplicated reach is fetched further down, once the
+    # campaign rows reveal which campaigns were actually active in the period.
+    # Asking for it up front meant filtering on all ~1 100 lifetime campaign IDs,
+    # which produced a 32 KB URL that Meta rejected outright. It also cannot be
+    # split into batches: separate dedup figures cannot be summed without
+    # double-counting people reached by campaigns in different batches.
 
-    # ── 2. Account-level deduplicated reach (Footland only) ───────────────────
+    # ── 2. Campaign-level insights (Footland only) ────────────────────────────
     try:
-        # Use a more explicit time_range parameter for account insights
-        resp = _get_ads(f"{AD_ACCOUNT_ID}/insights", {
-            "level":         "account",
-            "fields":        "reach",
-            "filtering":     _FILTERING,
-            "time_range":    time_range,
-        })
-        rows_acc = resp.get("data", [])
-        if rows_acc:
-            out["totals"]["reach"] = _safe_int(rows_acc[0].get("reach"))
-    except Exception as e:
-        print(f"DEBUG boost: account-level reach error: {e}")
-
-    # ── 3. Campaign-level insights (Footland only) ────────────────────────────
-    try:
-        # Ensure the time_range is strictly passed to prevent lifetime defaults
-        rows = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/insights", {
+        # Fetched UNFILTERED and narrowed by name in Python. Meta only returns
+        # campaigns with delivery in the window, so this is one page rather than
+        # eight batched requests filtered on every lifetime campaign ID — and
+        # request volume is what was tripping the app-level rate limit.
+        _all_rows = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/insights", {
             "level":      "campaign",
             "fields":     _FIELDS,
-            "filtering":  _FILTERING,
             "time_range": time_range,
             "limit":      500,
         })
+        rows = [r for r in _all_rows if _is_footland(r.get("campaign_name"))]
+        print(f"DEBUG boost: {len(rows)} Footland campaign rows "
+              f"(of {len(_all_rows)} account-wide) for {since}→{until}")
 
         campaigns    = []
         conv_ids:    list[str]        = []   # campaign IDs with conversion objective
@@ -565,6 +691,27 @@ def fetch_boost_insights(
                 if ctr_val:  cv_ctrs.append(ctr_val)
                 if freq_val: cv_freqs.append(freq_val)
 
+        # ── Account-level deduplicated reach (Footland, active campaigns) ─────
+        # Filtered on the campaigns that actually returned data for this period
+        # (tens of IDs) rather than every campaign ever created (~1 100), which
+        # is what made this URL too long for Meta to accept.
+        _active_ids = [cid for ids in obj_camp_ids.values() for cid in ids]
+        if _active_ids:
+            try:
+                resp = _get_ads(f"{AD_ACCOUNT_ID}/insights", {
+                    "level":      "account",
+                    "fields":     "reach",
+                    "filtering":  json.dumps([{
+                        "field": "campaign.id", "operator": "IN", "value": _active_ids
+                    }]),
+                    "time_range": time_range,
+                })
+                rows_acc = resp.get("data", [])
+                if rows_acc:
+                    out["totals"]["reach"] = _safe_int(rows_acc[0].get("reach"))
+            except Exception as e:
+                print(f"DEBUG boost: account-level reach error: {e}")
+
         # Deduplicated reach for conversion campaigns only
         cv_reach = 0
         if conv_ids:
@@ -680,18 +827,16 @@ def fetch_adset_ad_insights(
     if not footland_ids:
         return {"adsets": [], "ads": [], "period": {"since": since, "until": until}}
 
-    # insights-level filter (campaign.id is valid here)
-    _FILTERING = json.dumps([{
-        "field":    "campaign.id",
-        "operator": "IN",
-        "value":    footland_ids,
-    }])
-    # non-insights endpoints use campaign_id (no dot notation)
-    _CAMP_ID_FILTER = json.dumps([{
-        "field":    "campaign_id",
-        "operator": "IN",
-        "value":    footland_ids,
-    }])
+    # Only campaigns that ran in this period can have adsets or ads to report,
+    # so the heavy calls below filter on those (~60 IDs) instead of every
+    # campaign ever created (~1 100). Falls back to the full list if the probe
+    # fails, since batching keeps that correct even though it is slower.
+    period_ids = _active_footland_ids(time_range) or footland_ids
+
+    # Filters are built per batch inside _get_ads_filtered(). Both the
+    # insights and /adsets edges want "campaign.id" (dot notation): the
+    # /adsets edge accepts "campaign_id" without error but silently returns
+    # zero rows, which is why adset budgets were always blank.
     footland_set = set(footland_ids)
 
     # ── 1. Campaign metadata (objective, status, budget) ──────────────────────
@@ -726,11 +871,12 @@ def fetch_adset_ad_insights(
     # ── 2. Adset metadata (budget) ────────────────────────────────────────────
     _adset_meta: dict[str, dict] = {}
     try:
-        all_adsets_meta = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/adsets", {
-            "fields":    "id,campaign_id,daily_budget,lifetime_budget,start_time,end_time",
-            "filtering": _CAMP_ID_FILTER,
-            "limit":     500,
-        })
+        all_adsets_meta = _get_ads_filtered(
+            f"{AD_ACCOUNT_ID}/adsets",
+            {"fields": "id,campaign_id,daily_budget,lifetime_budget,start_time,end_time",
+             "limit": 500},
+            "campaign.id", period_ids,
+        )
         for a in all_adsets_meta:
             aid   = a.get("id", "")
             daily = _safe_float(a.get("daily_budget",    0)) / 100
@@ -928,13 +1074,12 @@ def fetch_adset_ad_insights(
     # ── Adset level ───────────────────────────────────────────────────────────
     adsets = []
     try:
-        adset_rows = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/insights", {
-            "level":      "adset",
-            "fields":     _ADSET_FIELDS,
-            "filtering":  _FILTERING,
-            "time_range": time_range,
-            "limit":      500,
-        })
+        adset_rows = _get_ads_filtered(
+            f"{AD_ACCOUNT_ID}/insights",
+            {"level": "adset", "fields": _ADSET_FIELDS,
+             "time_range": time_range, "limit": 500},
+            "campaign.id", period_ids,
+        )
         for r in adset_rows:
             adsets.append(_parse_adset_row(r))
         print(f"DEBUG adset insights: {len(adsets)} adsets")
@@ -944,13 +1089,12 @@ def fetch_adset_ad_insights(
     # ── Ad level ──────────────────────────────────────────────────────────────
     ads = []
     try:
-        ad_rows = _get_ads_all_pages(f"{AD_ACCOUNT_ID}/insights", {
-            "level":      "ad",
-            "fields":     _AD_FIELDS,
-            "filtering":  _FILTERING,
-            "time_range": time_range,
-            "limit":      500,
-        })
+        ad_rows = _get_ads_filtered(
+            f"{AD_ACCOUNT_ID}/insights",
+            {"level": "ad", "fields": _AD_FIELDS,
+             "time_range": time_range, "limit": 500},
+            "campaign.id", period_ids,
+        )
         for r in ad_rows:
             ads.append(_parse_ad_row(r))
         print(f"DEBUG ad insights: {len(ads)} ads")

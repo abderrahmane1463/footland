@@ -880,7 +880,15 @@ def _render_campaigns_table(campaigns: list[dict], adset_ad_data: dict | None = 
         st.divider()
         _render_campaign_kpi_table(campaigns, adset_ad_data)
     else:
-        _no_data_banner("Aucune donnée ads disponible — les données adset/ads se chargent séparément.")
+        # This is a failed fetch, not a pending one — the adset/ad data is
+        # loaded synchronously before this renders. Saying "loading separately"
+        # sent debugging down the wrong path for a rate-limit error.
+        _no_data_banner(
+            "Aucune donnée ads pour cette période — soit aucune publicité n'a "
+            "été diffusée, soit la récupération a échoué (limite de requêtes "
+            "Meta). Cliquez sur « 🔄 Refresh Data » ; si le problème persiste, "
+            "consultez les logs (DEBUG ad insights error)."
+        )
 
     # ── One expander per campaign ──────────────────────────────────────────────
     for c in sorted(campaigns, key=lambda x: x.get("spend", 0.0), reverse=True):
