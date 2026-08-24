@@ -96,6 +96,13 @@ recommendations. Three rules make it trustworthy:
 - *Deltas are the point.* Each `ctx_*` payload carries `_prev` (previous-period
   values under the same keys). Without them the model can only restate the KPI
   cards; with them it can explain a movement.
+- *Shape, not just totals.* `_series` carries the daily curves, reduced in
+  Python to peak, trough and start/middle/end averages — what lets the report
+  say "a peak on 1 August followed by a fade" instead of only "+66.9%".
+- *Context the API cannot see.* A "Contexte du mois" box feeds seasonality,
+  promotions and budget decisions into the payload. The monthly PDF's best
+  line — "un effet Ramadan qui avait boosté mars" — is not derivable from any
+  metric; it has to be typed in.
 - *Paid traffic is disclosed.* Page reach and views include ads, so when the
   Boost tab has loaded, the ad-spend trend is passed along and the report must
   separate genuine organic performance from budget-driven lift.

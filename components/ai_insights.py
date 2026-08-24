@@ -33,7 +33,8 @@ GROQ_MAX_TOKENS = 3000
 # Keys carrying structure rather than a KPI value.
 PREV_KEY = "_prev"
 NOTES_KEY = "_notes"
-_INTERNAL_KEYS = {PREV_KEY, NOTES_KEY}
+SERIES_KEY = "_series"
+_INTERNAL_KEYS = {PREV_KEY, NOTES_KEY, SERIES_KEY}
 
 
 # Human-readable labels with units. The model may not compute anything, so it
@@ -92,6 +93,13 @@ RÈGLES ABSOLUES :
 - Ne compare jamais le CTR entre objectifs différents : une campagne notoriété
   optimise la portée, pas le clic. Signale ce piège si c'est pertinent.
 - Si un indicateur est absent ou nul, ignore-le. N'invente aucune donnée.
+- Quand une section « ÉVOLUTION DANS LE TEMPS » est fournie, décris la FORME de la
+  courbe (pics, creux, début / milieu / fin de période) — pas seulement le total.
+  Exemple de ton attendu : « Le mois présente une évolution fluctuante avec
+  plusieurs pics, mais une baisse globale de -3,1 %. »
+- Quand une section « CONTEXTE MÉTIER » est fournie, sers-t'en en priorité pour
+  expliquer les variations : elle contient ce que les chiffres ne disent pas
+  (opérations commerciales, changements de budget, saisonnalité).
 - Français professionnel, direct, sans jargon inutile. Pas de conclusion générique."""
 
 _STRUCTURES = {
@@ -168,6 +176,51 @@ def _variation(current, previous) -> str | None:
     return f"{'+' if pct >= 0 else ''}{pct:.1f} %"
 
 
+def _describe_series(label: str, series: list) -> str | None:
+    """Reduce a daily series to the shape descriptors a written report needs.
+
+    A total says reach rose 67 %; it cannot say the month peaked on 1 August
+    and collapsed afterwards. The monthly PDF reports lean on exactly that
+    ("plusieurs pics", "creux en milieu de période"), so the peak, the trough
+    and the start/middle/end averages are computed here — in Python, because
+    the model is not allowed to calculate anything.
+    """
+    points = [(p.get("date"), p.get("value") or 0)
+              for p in (series or []) if p.get("date")]
+    if len(points) < 3:
+        return None
+
+    points.sort(key=lambda x: str(x[0]))
+    n = len(points)
+    third = max(1, n // 3)
+    segments = {
+        "début":  points[:third],
+        "milieu": points[third:2 * third],
+        "fin":    points[2 * third:],
+    }
+
+    def _where(date) -> str:
+        for name, seg in segments.items():
+            if any(d == date for d, _ in seg):
+                return name
+        return "—"
+
+    peak   = max(points, key=lambda x: x[1])
+    trough = min(points, key=lambda x: x[1])
+    averages = {name: sum(v for _, v in seg) / len(seg)
+                for name, seg in segments.items() if seg}
+
+    lines = [
+        f"- {label} — évolution journalière sur {n} jours :",
+        f"    · moyenne journalière : {_fmt(round(sum(v for _, v in points) / n))}",
+        f"    · pic : {peak[0]} ({_fmt(peak[1])}) — en {_where(peak[0])} de période",
+        f"    · creux : {trough[0]} ({_fmt(trough[1])}) — en {_where(trough[0])} de période",
+        "    · moyennes par tiers : " + ", ".join(
+            f"{name} {_fmt(round(v))}" for name, v in averages.items()),
+    ]
+    return "\n".join(lines)
+
+
 def build_payload(ctx: dict) -> str:
     """Turn a ctx_* dict into labelled lines carrying units and variations."""
     prev = ctx.get(PREV_KEY) or {}
@@ -190,8 +243,16 @@ def build_payload(ctx: dict) -> str:
         lines.append(row)
 
     payload = "\n".join(lines)
+
+    # Daily curves — what lets the report describe the shape of the month
+    # ("pic en fin de période") rather than only its total.
+    shapes = [s for label, series in (ctx.get(SERIES_KEY) or {}).items()
+              if (s := _describe_series(label, series))]
+    if shapes:
+        payload += "\n\nÉVOLUTION DANS LE TEMPS :\n" + "\n".join(shapes)
+
     if notes:
-        payload += "\n\nCONTEXTE :\n" + "\n".join(f"- {n}" for n in notes)
+        payload += "\n\nCONTEXTE MÉTIER :\n" + "\n".join(f"- {n}" for n in notes)
     return payload
 
 
@@ -302,6 +363,29 @@ def render_ai_report(section_label: str, ctx: dict | None, *, key: str,
 
     ctx = dict(ctx)
     notes = list(ctx.get(NOTES_KEY) or []) + list(extra_notes or [])
+
+    st.markdown("<div style='margin-top:1.5rem;'></div>", unsafe_allow_html=True)
+
+    # The single biggest quality lever. Seasonality, promotions and budget
+    # decisions are invisible in the API — the monthly PDF's best line
+    # ("un effet Ramadan qui avait boosté mars") could never be derived from
+    # the numbers. Typing it here is what turns a summary into commentary.
+    with st.expander("📝 Contexte du mois (optionnel) — améliore nettement l'analyse"):
+        st.caption(
+            "Ce que les chiffres ne disent pas : opération commerciale, changement "
+            "de budget, saisonnalité (Ramadan, soldes), refonte des créas…"
+        )
+        user_note = st.text_area(
+            "Contexte",
+            key=f"note_{key}",
+            label_visibility="collapsed",
+            placeholder="Ex : Soldes été lancées en semaine 30 · budget Ads doublé · "
+                        "mars était porté par le Ramadan",
+            height=80,
+        )
+    if user_note and user_note.strip():
+        notes.append(f"Éléments fournis par l'agence : {user_note.strip()}")
+
     if notes:
         ctx[NOTES_KEY] = notes
 
@@ -311,10 +395,10 @@ def render_ai_report(section_label: str, ctx: dict | None, *, key: str,
 
     state_key = f"ai_report_{key}"
 
+    # The context text is part of the payload, so editing it invalidates the
+    # stored report and offers the button again — the analysis can never sit
+    # under context it wasn't written from.
     if st.session_state.get(state_key) != payload:
-        # Discreet by design: the report sits at the bottom of the page as an
-        # option, not as something competing with the KPIs for attention.
-        st.markdown("<div style='margin-top:1.5rem;'></div>", unsafe_allow_html=True)
         if not st.button("🧠 Générer le rapport d'analyse",
                          key=f"btn_{state_key}", type="tertiary"):
             return

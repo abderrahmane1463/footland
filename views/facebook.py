@@ -310,6 +310,17 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
     _prev_posts   = prev_post_totals.get("total_posts", 0)
     _prev_reach   = prev_vis.get("period_reach", 0) or safe_sum(prev_vis.get("reach", []))
 
+    # Daily curves for the AI report, so it can describe the shape of the month
+    # (peaks, troughs, start/middle/end) and not just the totals.
+    st.session_state["ctx_facebook"]["_series"] = {
+        k: v for k, v in {
+            "Portée":            vis.get("reach", []),
+            "Impressions":       vis.get("impressions", []),
+            "Vues de la page":   vis.get("page_views", []),
+            "Nouveaux abonnés":  aud.get("fans_adds", []),
+        }.items() if v
+    }
+
     # Previous period for the AI report — same keys as the context above, so it
     # can explain what rose and what fell. Set here because these values are
     # only computed after the context dict is built.

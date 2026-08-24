@@ -287,6 +287,15 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
     _p_comms  = sum(p.get("comments",  0) for p in prev_ig_posts)
     _p_shares = sum(p.get("shares",    0) for p in prev_ig_posts)
     _p_saves  = sum(p.get("saves",     0) for p in prev_ig_posts)
+    # Daily curve for the AI report — lets it describe peaks and troughs
+    # rather than only the period total.
+    _ig_series = {k: v for k, v in {
+        "Portée":            ig_profile.get("reach", []),
+        "Nouveaux abonnés":  ig_profile.get("follower_additions", []),
+    }.items() if v}
+    if _ig_series:
+        st.session_state["ctx_instagram"]["_series"] = _ig_series
+
     st.session_state["ctx_instagram"]["_prev"] = {
         k: v for k, v in {
             "followers":          _prev_followers,
