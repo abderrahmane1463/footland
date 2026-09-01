@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import db
 from components.ai_insights import render_ai_report, paid_spend_note
+from components.alerts import render_alerts
 from components.charts import get_chart_layout, series_to_df, safe_sum
 from components.skeleton import skeleton_dashboard_html, skeleton_charts_html
 
@@ -316,6 +317,7 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
 
     # ── TAB 1: Engagement ─────────────────────────────────────────────────────
     with tab2:
+        render_alerts()
         # Build daily series from posts
         _ci_d, _likes_d, _comms_d, _saves_d = {}, {}, {}, {}
         for p in ig_posts:
@@ -538,6 +540,7 @@ def render_instagram_dashboard(period_label: str, days: int, start_date, end_dat
 
     # ── TAB 2: Visibility ─────────────────────────────────────────────────────
     with tab1:
+        render_alerts()
         reach_df = series_to_df(ig_profile.get("reach", []))
 
         # ── Fallbacks: build daily series from per-post data when account-level

@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import db
 from components.ai_insights import render_ai_report, paid_spend_note
+from components.alerts import render_alerts
 from components.charts import get_chart_layout, series_to_df, safe_sum, render_top3_podium
 from components.skeleton import skeleton_dashboard_html, skeleton_charts_html
 
@@ -418,6 +419,7 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
 
     # ── TAB 1: Audience ───────────────────────────────────────────────────────
     with tab1:
+        render_alerts()
         hcol1, hcol2 = st.columns([1, 1])
         _h1c = "#ffffff" if _dark else "#111827"
         _h2c = "rgba(255,255,255,0.6)" if _dark else "#6b7280"
@@ -577,6 +579,7 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
 
     # ── TAB 3: Engagement ────────────────────────────────────────────────────
     with tab3:
+        render_alerts()
         # Build daily series from posts (same approach as Instagram)
         _ci_d, _reac_d, _comm_d, _shar_d = {}, {}, {}, {}
         for p in posts:
@@ -803,6 +806,7 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
 
     # ── TAB 3: Engagement ─────────────────────────────────────────────────────
     with tab2:
+        render_alerts()
         st.markdown('<div class="section-header">Reach & Page View Fluctuations</div>', unsafe_allow_html=True)
         reach_df      = series_to_df(vis.get("reach", []))
         views_df      = series_to_df(vis.get("page_views", []))
@@ -919,6 +923,7 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
 
     # ── TAB 4: Top Content ────────────────────────────────────────────────────
     with tab4:
+        render_alerts()
         if posts:
             render_top3_podium(
                 posts,
@@ -947,6 +952,7 @@ def render_facebook_dashboard(period_label: str, days: int, start_date, end_date
 
     # ── TAB 5: Community Management ───────────────────────────────────────────
     with tab5:
+        render_alerts()
         st.markdown('<div class="section-header">Community Management</div>', unsafe_allow_html=True)
         new_t = msg_stats.get("new_conversations", 0)
 

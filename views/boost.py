@@ -22,7 +22,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components.ai_insights import render_ai_report
-from components.alerts import check_all, render_alerts
+from components.alerts import check_all, publish_alerts, render_alerts
 from components.charts import get_chart_layout
 from api.boost import fetch_reach_for_ids
 
@@ -1354,15 +1354,24 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
         unsafe_allow_html=True,
     )
 
-    # Alerts sit above the tabs: a problem worth interrupting for should not be
-    # hidden behind a tab the reader might not open. Renders nothing when the
-    # account is healthy.
-    render_alerts(check_all(
+    # period_days makes the saturation threshold meaningful: frequency is
+    # cumulative, so 5,63 over 30 days is healthy while the same figure over a
+    # week is not.
+    _period_days = None
+    try:
+        from datetime import date as _d
+        if since and until:
+            _period_days = (_d.fromisoformat(until) - _d.fromisoformat(since)).days + 1
+    except Exception:  # noqa: BLE001
+        pass
+
+    publish_alerts("boost", check_all(
         campaigns=campaigns,
         totals=totals,
         prev_totals=prev_totals,
         adset_ad_data=adset_ad_data,
-    ), scope="boost")
+        period_days=_period_days,
+    ))
 
     t1, t2, t3, t4, t5, t6 = st.tabs([
         "📊 Global",
@@ -1374,26 +1383,32 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
     ])
 
     with t1:
+        render_alerts()
         _render_global_kpis(totals, prev_totals)
         st.divider()
         _render_conversion_campaigns(conv, prev_conv)
 
     with t2:
+        render_alerts()
         _render_funnel(totals, campaigns)
         st.divider()
         _render_acquisition_kpis(totals, campaigns)
 
     with t3:
+        render_alerts()
         _render_by_objective(campaigns, obj_reach,
                              {"since": _period_since, "until": _period_until})
 
     with t4:
+        render_alerts()
         _render_top_campaigns(campaigns)
 
     with t5:
+        render_alerts()
         _render_campaigns_table(campaigns, adset_ad_data=adset_ad_data)
 
     with t6:
+        render_alerts()
         _render_demographics(demo)
         st.divider()
         _render_geographic(demo)

@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components.ai_insights import render_ai_report
-from components.alerts import check_all, render_alerts
+from components.alerts import check_all, publish_alerts, render_alerts
 from components.charts import get_chart_layout
 
 
@@ -535,7 +535,7 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
     _ov = ga4_data.get("overview", {})
 
     # Flags broken tracking before the reader takes the KPI cards at face value.
-    render_alerts(check_all(ga4_overview=_ov), scope="ga4")
+    publish_alerts("ga4", check_all(ga4_overview=_ov))
 
     _ctx_ga4 = {
         "period": f"{since} → {until}",
@@ -600,19 +600,23 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
     ])
 
     with t1:
+        render_alerts()
         _render_overview(ga4_data.get("overview", {}))
         st.divider()
         _render_traffic_sources(ga4_data.get("traffic_sources", []))
 
     with t2:
+        render_alerts()
         _render_purchase_journey(ga4_data.get("purchase_journey", {}))
         st.divider()
         _render_ecommerce_items(ga4_data.get("ecommerce_items", []))
 
     with t3:
+        render_alerts()
         _render_events(ga4_data.get("events", []))
 
     with t4:
+        render_alerts()
         _render_geography(ga4_data.get("geography", {}))
         st.divider()
         _render_devices(ga4_data.get("devices", []))

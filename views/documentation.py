@@ -475,7 +475,7 @@ Affiché immédiatement après le tableau Sales, avec son propre filtre et son p
 
     st.markdown("""
 <p style="color:#a1a1aa;font-size:13px;">
-Des alertes s'affichent en haut de l'onglet concerné lorsqu'un seuil est franchi.
+Des alertes s'affichent en haut de chaque onglet et sous-onglet lorsqu'un seuil est franchi. Une alerte détectée sur une plateforme reste visible depuis les autres pendant la session.
 La détection est faite par des règles fixes, <strong>pas par l'IA</strong> : un seuil se
 déclenche ou non, de façon identique à chaque exécution. Les seuils sont calibrés sur
 les données réelles de Footland (CPC ~0,005 EUR, coût par commande 1,35–2,00 EUR),
@@ -490,7 +490,7 @@ plus de deux fois par semaine est mal calibrée, pas informative.
 <table class="kpi-table">
   <tr><th>Règle</th><th>Seuil</th><th>Pourquoi</th></tr>
   <tr><td class="kpi-name">💸 Coût par commande</td><td class="kpi-desc">Alerte à <strong>3 EUR</strong>, critique à <strong>5 EUR</strong>. Campagne dépensant plus de 50 EUR sans aucune commande : critique.</td><td><span class="endpoint">Référence observée : 1,35 à 2,01 EUR. Uniquement sur les campagnes Ventes — une campagne notoriété ne génère pas de commandes par nature.</span></td></tr>
-  <tr><td class="kpi-name">🔁 Saturation d'audience</td><td class="kpi-desc">Répétition &gt; <strong>2,5</strong> (critique à 3), ou répétition en hausse de +15 % pendant que le CTR recule de 15 %.</td><td><span class="endpoint">Le signal combiné est la signature d'une audience usée ; pris isolément, chaque indicateur prouve peu.</span></td></tr>
+  <tr><td class="kpi-name">🔁 Saturation d'audience</td><td class="kpi-desc">Répétition &gt; <strong>3 par semaine</strong> (critique à 4), ou répétition en hausse de +15 % pendant que le CTR recule de 15 %.</td><td><span class="endpoint">Le seuil est ramené à la semaine : la répétition s'accumule avec la durée de la période, donc 5,63 sur 30 jours (1,31/semaine) est sain alors que le même chiffre sur 7 jours ne l'est pas.</span></td></tr>
   <tr><td class="kpi-name">📊 Données ads manquantes</td><td class="kpi-desc">Des campagnes ont diffusé mais aucune publicité n'est récupérée.</td><td><span class="endpoint">Détecte l'échec silencieux qui avait vidé les tableaux Rapport pendant plusieurs jours.</span></td></tr>
   <tr><td class="kpi-name">🌐 Suivi GA4 défaillant</td><td class="kpi-desc">Moins de 0,5 page vue par session.</td><td><span class="endpoint">Détecte un tag page_view cassé — 12 pages vues déclarées pour 628 962 sessions passaient inaperçues.</span></td></tr>
 </table>""", unsafe_allow_html=True)

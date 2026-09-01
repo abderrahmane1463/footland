@@ -37,9 +37,15 @@ COST_PER_ORDER_CRIT = 5.0
 # and alerting on it is how an alert system gets muted.
 MIN_SPEND_FOR_ORDER_ALERT = 50.0
 
-# Saturation. Frequency was 1,52 and is now 1,89 — rising but not yet critical.
-FREQUENCY_WARN = 2.5
-FREQUENCY_CRIT = 3.0
+# Saturation, expressed PER WEEK.
+#
+# Raw frequency accumulates with the length of the window, so a single absolute
+# threshold is meaningless across date ranges: 5,63 over 30 days is one exposure
+# every five days (healthy), while 5,63 over 7 days would be severe. The first
+# version of this rule used 2,5 flat and fired immediately on "Last 30 Days" —
+# exactly the cry-wolf failure that gets an alert system muted.
+FREQUENCY_WARN_PER_WEEK = 3.0
+FREQUENCY_CRIT_PER_WEEK = 4.0
 # Neither signal proves much alone; together they are the specific signature of
 # audience saturation, so the pair fires at a lower bar than either would.
 SATURATION_FREQ_RISE_PCT = 15.0
@@ -123,25 +129,37 @@ def check_cost_per_order(campaigns: list) -> list:
 
 
 # ─── Rule 2 — audience saturation ─────────────────────────────────────────────
-def check_saturation(totals: dict, prev_totals: dict | None) -> list:
-    """Frequency climbing while CTR falls — the signature of a worn audience."""
+def check_saturation(totals: dict, prev_totals: dict | None,
+                     period_days: int | None = None) -> list:
+    """Frequency climbing while CTR falls — the signature of a worn audience.
+
+    period_days is what makes the absolute threshold meaningful: frequency is
+    cumulative over the window, so it is converted to a weekly rate before
+    being compared.
+    """
     alerts = []
     totals = totals or {}
     freq = totals.get("frequency", 0) or 0
 
-    if freq >= FREQUENCY_CRIT:
+    weeks = (period_days / 7) if period_days and period_days >= 7 else 1
+    weekly = freq / weeks if weeks else freq
+    span = f" sur {period_days} jours" if period_days else ""
+
+    if weekly >= FREQUENCY_CRIT_PER_WEEK:
         alerts.append(_alert(
             "saturation", CRITICAL,
             "Répétition critique",
-            f"La répétition atteint {freq:.2f} : les mêmes personnes voient les "
-            f"publicités trop souvent. Élargir le ciblage ou renouveler les créas.",
+            f"La répétition atteint {freq:.2f}{span}, soit {weekly:.2f} par semaine : "
+            f"les mêmes personnes voient les publicités trop souvent. "
+            f"Élargir le ciblage ou renouveler les créas.",
             "boost",
         ))
-    elif freq >= FREQUENCY_WARN:
+    elif weekly >= FREQUENCY_WARN_PER_WEEK:
         alerts.append(_alert(
             "saturation", WARNING,
             "Répétition élevée",
-            f"La répétition atteint {freq:.2f} (seuil d'alerte {FREQUENCY_WARN}).",
+            f"La répétition atteint {freq:.2f}{span}, soit {weekly:.2f} par semaine "
+            f"(seuil d'alerte {FREQUENCY_WARN_PER_WEEK:.1f}/semaine).",
             "boost",
         ))
 
@@ -219,14 +237,15 @@ def check_ga4_tracking(overview: dict | None) -> list:
 def check_all(*, campaigns: list | None = None, totals: dict | None = None,
               prev_totals: dict | None = None,
               adset_ad_data: dict | None = None,
-              ga4_overview: dict | None = None) -> list:
+              ga4_overview: dict | None = None,
+              period_days: int | None = None) -> list:
     """Run every rule. Each is independent — one raising must not silence the
     others, since the data-integrity rules matter most when something is
     already going wrong."""
     alerts = []
     for rule, args in (
         (check_cost_per_order, (campaigns,)),
-        (check_saturation,     (totals, prev_totals)),
+        (check_saturation,     (totals, prev_totals, period_days)),
         (check_ads_pipeline,   (campaigns, adset_ad_data)),
         (check_ga4_tracking,   (ga4_overview,)),
     ):
@@ -242,6 +261,30 @@ def check_all(*, campaigns: list | None = None, totals: dict | None = None,
     return alerts
 
 
+# ─── Session store ────────────────────────────────────────────────────────────
+# Only one platform renders per run (the sidebar is a radio), so alerts are kept
+# in session state. That way a problem found on Boost stays visible while the
+# reader is on Google Analytics — a broken pipeline matters wherever you are.
+_SCOPE_LABELS = {
+    "boost":     "Boost",
+    "ga4":       "Google Analytics",
+    "facebook":  "Facebook",
+    "instagram": "Instagram",
+}
+
+
+def publish_alerts(scope: str, alerts: list) -> list:
+    """Record this scope's alerts for the session and return them."""
+    store = st.session_state.setdefault("alerts", {})
+    store[scope] = alerts or []
+    return alerts or []
+
+
+def known_alerts() -> list:
+    """Every alert seen so far this session, across platforms."""
+    return [a for lst in (st.session_state.get("alerts") or {}).values() for a in lst]
+
+
 # ─── Rendering ────────────────────────────────────────────────────────────────
 _STYLES = {
     CRITICAL: ("rgba(248,113,113,0.10)", "rgba(248,113,113,0.45)", "#f87171", "🔴"),
@@ -249,26 +292,41 @@ _STYLES = {
 }
 
 
-def render_alerts(alerts: list, scope: str | None = None):
-    """Render alerts for one scope. Renders nothing when there is nothing wrong."""
-    shown = [a for a in (alerts or []) if scope is None or a.get("scope") == scope]
+def render_alerts(alerts: list | None = None, scope: str | None = None):
+    """Render alerts. Renders nothing when there is nothing wrong.
+
+    Called with no arguments it renders every alert known this session, which
+    is how each tab and sub-tab shows the same set.
+    """
+    source = known_alerts() if alerts is None else alerts
+    shown = [a for a in (source or []) if scope is None or a.get("scope") == scope]
     if not shown:
         return
 
-    # Critical first — the ordering is the triage.
-    shown.sort(key=lambda a: 0 if a["severity"] == CRITICAL else 1)
+    # Critical first — the ordering is the triage. De-duplicated because the
+    # same rule can be published more than once in a session.
+    seen, unique = set(), []
+    for a in sorted(shown, key=lambda x: 0 if x["severity"] == CRITICAL else 1):
+        marker = (a["rule"], a["detail"])
+        if marker not in seen:
+            seen.add(marker)
+            unique.append(a)
 
     dark = st.session_state.get("theme", "dark") == "dark"
     text_c = "#e4e4e7" if dark else "#1f2937"
+    muted_c = "rgba(255,255,255,0.40)" if dark else "#9ca3af"
 
     blocks = []
-    for a in shown:
+    for a in unique:
         bg, border, accent, icon = _STYLES.get(a["severity"], _STYLES[WARNING])
+        label = _SCOPE_LABELS.get(a.get("scope", ""), "")
+        badge = (f'<span style="font-size:0.68rem;color:{muted_c};'
+                 f'font-weight:500;"> · {label}</span>') if label else ""
         blocks.append(
             f'<div style="background:{bg};border-left:3px solid {border};'
             f'border-radius:8px;padding:0.7rem 0.9rem;margin-bottom:0.5rem;">'
             f'<div style="font-size:0.85rem;font-weight:700;color:{accent};'
-            f'margin-bottom:0.2rem;">{icon} {a["title"]}</div>'
+            f'margin-bottom:0.2rem;">{icon} {a["title"]}{badge}</div>'
             f'<div style="font-size:0.8rem;line-height:1.55;color:{text_c};">'
             f'{a["detail"]}</div></div>'
         )
