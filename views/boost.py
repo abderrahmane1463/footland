@@ -22,6 +22,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components.ai_insights import render_ai_report
+from components.alerts import check_all, render_alerts
 from components.charts import get_chart_layout
 from api.boost import fetch_reach_for_ids
 
@@ -1352,6 +1353,16 @@ def render_boost_tab(data: dict | None = None, demo: dict | None = None,
         f'Performances publicitaires payantes · Meta Marketing API</p>',
         unsafe_allow_html=True,
     )
+
+    # Alerts sit above the tabs: a problem worth interrupting for should not be
+    # hidden behind a tab the reader might not open. Renders nothing when the
+    # account is healthy.
+    render_alerts(check_all(
+        campaigns=campaigns,
+        totals=totals,
+        prev_totals=prev_totals,
+        adset_ad_data=adset_ad_data,
+    ), scope="boost")
 
     t1, t2, t3, t4, t5, t6 = st.tabs([
         "📊 Global",

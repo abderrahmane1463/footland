@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components.ai_insights import render_ai_report
+from components.alerts import check_all, render_alerts
 from components.charts import get_chart_layout
 
 
@@ -532,6 +533,10 @@ def render_analytics_tab(ga4_data: dict, since: str = "", until: str = ""):
 
     # ── Context for AI chatbot ────────────────────────────────────────────────
     _ov = ga4_data.get("overview", {})
+
+    # Flags broken tracking before the reader takes the KPI cards at face value.
+    render_alerts(check_all(ga4_overview=_ov), scope="ga4")
+
     _ctx_ga4 = {
         "period": f"{since} → {until}",
         "active_users": _ov.get("active_users", 0),

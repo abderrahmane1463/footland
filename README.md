@@ -23,6 +23,7 @@ See `.env.example` for the full list of environment variables required
 app.py                    Streamlit entry point — routing, theming, prefetch threads
   ├── components/
   │   ├── sidebar.py       Platform selector, date range picker, refresh button
+  │   ├── alerts.py         Threshold rules (detection is Python, not AI)
   │   ├── llm.py            Shared LLM layer (DeepSeek primary, Groq fallback)
   │   ├── chatbot.py        Floating AI assistant
   │   ├── ai_insights.py    Per-platform AI analysis report (trends + reco)
@@ -69,6 +70,22 @@ app.py                    Streamlit entry point — routing, theming, prefetch t
   Supabase and clears Streamlit's cache.
 - `fetcher.py` can be run on a schedule (see `.github/workflows/fetch.yml`) to
   pre-populate Supabase for every date-range preset.
+
+## Alerts
+
+`components/alerts.py` runs four threshold rules and renders anything that
+fires above the tabs of the relevant view. **Detection is plain Python, not a
+model** — a threshold fires identically on every run and can be tested, whereas
+a model asked "is anything wrong?" answers differently on identical data.
+
+Thresholds come from Footland's own baseline (CPC ~€0.005, cost per order
+€1.35–2.01), not European benchmarks that are off by an order of magnitude on
+this market. Two rules watch the data pipeline rather than performance — they
+catch the failures that silently show a client wrong numbers.
+
+Currently **log-only**: alerts display and print to the server log, but nobody
+is notified. Count firing frequency for a few weeks first; a rule firing more
+than twice a week is mistuned, not informative.
 
 ## AI features
 
