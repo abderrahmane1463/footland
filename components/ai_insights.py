@@ -411,7 +411,9 @@ def render_ai_report(section_label: str, ctx: dict | None, *, key: str,
         st.session_state[state_key] = payload
 
     try:
-        with st.spinner("Analyse des données en cours…"):
+        # The wait is genuinely ~30 s (the model reasons before writing), so the
+        # duration is stated: an unexplained spinner that long reads as a freeze.
+        with st.spinner("🧠 Analyse des données en cours — environ 30 secondes…"):
             report = _generate(section_label, payload, kind)
     except Exception:  # noqa: BLE001 - never let this break the page
         st.caption(

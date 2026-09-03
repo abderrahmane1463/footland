@@ -38,8 +38,12 @@ DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 # that used to be here were decommissioned by Groq (404 model_not_found).
 GROQ_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
 
-REQUEST_TIMEOUT = 180
-MAX_ATTEMPTS = 3
+# A full report takes about 30 s on DeepSeek, so 90 s is generous headroom.
+# It used to be 180 s with three attempts, which meant a stalled request could
+# hold the spinner for nine minutes before even trying the fallback — fine for
+# a background job, unacceptable behind a UI someone is waiting on.
+REQUEST_TIMEOUT = 90
+MAX_ATTEMPTS = 2
 
 
 # ─── Key resolution ───────────────────────────────────────────────────────────
@@ -97,10 +101,18 @@ def call_deepseek(messages: list[dict], max_tokens: int,
                 return ""
             resp.raise_for_status()
             return (resp.json()["choices"][0]["message"]["content"] or "").strip()
+        except requests.exceptions.ReadTimeout as exc:
+            # The request was accepted but the model never answered within the
+            # budget. Retrying means waiting the full timeout again for the same
+            # likely outcome, so fall through to the fallback provider instead —
+            # it answers in about three seconds.
+            print(f"DEBUG llm: DeepSeek read timeout after {REQUEST_TIMEOUT}s: {exc}")
+            return ""
         except requests.exceptions.RequestException as exc:
-            # Timeouts and dropped connections happen and usually clear on a
-            # retry. Without this, a one-second blip silently demotes the user
-            # to the fallback model for the whole request.
+            # Connection-level failures (DNS, refused, dropped) fail within
+            # seconds and usually clear immediately, so retrying is cheap and
+            # worthwhile — without it a one-second blip silently demotes the
+            # user to the fallback model.
             print(f"DEBUG llm: DeepSeek network error (attempt {attempt + 1}): {exc}")
             if attempt + 1 < MAX_ATTEMPTS:
                 time.sleep(2 * (attempt + 1))
