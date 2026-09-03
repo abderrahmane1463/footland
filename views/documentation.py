@@ -121,7 +121,7 @@ def render_documentation():
     with col4:
         st.info("📊 **Google Analytics** — Vue d'ensemble + Sources de trafic, E-commerce (Parcours d'achat + Top articles), Événements, Audience (Géographie + Appareils)")
     with col5:
-        st.info("🤖 **Intelligence Artificielle** — Rapport d'analyse sur chaque plateforme (interprétation des hausses/baisses + recommandations) et chatbot flottant, tous deux propulsés par DeepSeek")
+        st.info("🤖 **Intelligence Artificielle** — Chatbot flottant propulsé par DeepSeek, répondant aux questions sur les données affichées")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -470,10 +470,14 @@ Affiché immédiatement après le tableau Sales, avec son propre filtre et son p
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Alertes ───────────────────────────────────────────────────────────────
-    st.markdown('<div class="doc-section-title">🚨 Alertes automatiques</div>', unsafe_allow_html=True)
+    # ── Alertes (admin) ───────────────────────────────────────────────────────
+    # Alerts and the AI report are agency tools, hidden from the client account,
+    # so their documentation is hidden too — describing a feature the reader
+    # cannot see only causes confusion.
+    if _is_admin:
+        st.markdown('<div class="doc-section-title">🚨 Alertes automatiques</div>', unsafe_allow_html=True)
 
-    st.markdown("""
+        st.markdown("""
 <p style="color:#a1a1aa;font-size:13px;">
 Des alertes s'affichent en haut de chaque onglet et sous-onglet lorsqu'un seuil est franchi. Une alerte détectée sur une plateforme reste visible depuis les autres pendant la session.
 La détection est faite par des règles fixes, <strong>pas par l'IA</strong> : un seuil se
@@ -495,13 +499,13 @@ plus de deux fois par semaine est mal calibrée, pas informative.
   <tr><td class="kpi-name">🌐 Suivi GA4 défaillant</td><td class="kpi-desc">Moins de 0,5 page vue par session.</td><td><span class="endpoint">Détecte un tag page_view cassé — 12 pages vues déclarées pour 628 962 sessions passaient inaperçues.</span></td></tr>
 </table>""", unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Intelligence Artificielle ─────────────────────────────────────────────
     st.markdown('<div class="doc-section-title">🤖 Intelligence Artificielle</div>', unsafe_allow_html=True)
 
     st.markdown("""
-<p style="color:#E8420A;font-size:15px;font-weight:700;">🧠 Rapport d'analyse</p>
+<p style="color:#E8420A;font-size:15px;font-weight:700;">🧠 Rapport d'analyse <span style="font-size:12px;font-weight:500;color:#a1a1aa;">— réservé à l'agence</span></p>
 <p style="color:#a1a1aa;font-size:13px;">
 Un bouton discret <strong>« 🧠 Générer le rapport d'analyse »</strong> se trouve tout en bas
 de chaque plateforme. Il produit un rapport qui <strong>interprète</strong> les chiffres : ce qui

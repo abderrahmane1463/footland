@@ -83,6 +83,10 @@ Thresholds come from Footland's own baseline (CPC ~€0.005, cost per order
 this market. Two rules watch the data pipeline rather than performance — they
 catch the failures that silently show a client wrong numbers.
 
+**Admin only** — alerts and the AI report are agency tools, hidden from the
+client (`viewer`) account. Detection still runs for viewers so the server log
+keeps a complete record.
+
 Currently **log-only**: alerts display and print to the server log, but nobody
 is notified. Count firing frequency for a few weeks first; a rule firing more
 than twice a week is mistuned, not informative.

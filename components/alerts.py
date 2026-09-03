@@ -297,7 +297,15 @@ def render_alerts(alerts: list | None = None, scope: str | None = None):
 
     Called with no arguments it renders every alert known this session, which
     is how each tab and sub-tab shows the same set.
+
+    Admin only. Alerts are an internal working tool — "cette campagne a dépensé
+    310 EUR sans commande" is a conversation to have with the client, not a
+    banner they read unannounced. Detection still runs for viewers so the
+    server log keeps a complete record.
     """
+    if st.session_state.get("user", {}).get("role") != "admin":
+        return
+
     source = known_alerts() if alerts is None else alerts
     shown = [a for a in (source or []) if scope is None or a.get("scope") == scope]
     if not shown:

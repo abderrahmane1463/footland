@@ -357,7 +357,13 @@ def render_ai_report(section_label: str, ctx: dict | None, *, key: str,
     key           : unique widget key (all views call this function).
     kind          : "ads", "social" or "web" — selects the report structure.
     extra_notes   : extra context lines appended to the payload.
+
+    Admin only. The report is a drafting tool: the agency writes the context,
+    reviews the output and decides what reaches the client. It also spends
+    DeepSeek credit, which should not be triggerable from a client account.
     """
+    if st.session_state.get("user", {}).get("role") != "admin":
+        return
     if not ctx:
         return
 
